@@ -79,6 +79,16 @@ def build_parser() -> argparse.ArgumentParser:
                         "is recognized)")
     p.add_argument("-j", "--jobs", type=int, default=1, metavar="N",
                    help="parallel scan processes (0 = all cores; default 1)")
+    bl = p.add_argument_group("BitLocker (Windows FVE)")
+    bl.add_argument("--bitlocker-recovery-key", metavar="KEY",
+                    help="unlock BitLocker volume(s) with a 48-digit recovery key "
+                         "(decrypts in place; carve/undelete then run on plaintext)")
+    bl.add_argument("--bitlocker-password", metavar="PASS",
+                    help="unlock BitLocker with the user passphrase")
+    bl.add_argument("--bitlocker-bek", metavar="FILE",
+                    help="unlock BitLocker with a startup-key .BEK file")
+    bl.add_argument("--bitlocker-fvek", metavar="HEX",
+                    help="supply the raw FVEK (hex) directly, skipping key recovery")
     p.add_argument("--offset", default="0",
                    help="start offset into source (supports K/M/G suffix)")
     p.add_argument("--length", default="0",
@@ -248,8 +258,46 @@ def run_auto(args) -> int:
     return rc
 
 
+def _setup_bitlocker(args) -> int:
+    """Build BitLocker credentials from CLI flags into CARVX_BITLOCKER env so
+    every open_source() (incl. spawned workers) unlocks transparently."""
+    if not (args.bitlocker_recovery_key or args.bitlocker_password
+            or args.bitlocker_bek or args.bitlocker_fvek):
+        return 0
+    from .bitlocker import Credentials, BitLockerError, parse_recovery_password
+    bek = None
+    if args.bitlocker_bek:
+        try:
+            with open(args.bitlocker_bek, "rb") as fh:
+                bek = fh.read()
+        except OSError as e:
+            print(f"error: --bitlocker-bek: {e}", file=sys.stderr)
+            return 2
+    fvek = None
+    if args.bitlocker_fvek:
+        try:
+            fvek = bytes.fromhex(args.bitlocker_fvek.replace(":", "").replace(" ", ""))
+        except ValueError:
+            print("error: --bitlocker-fvek must be hex", file=sys.stderr)
+            return 2
+    if args.bitlocker_recovery_key:
+        try:
+            parse_recovery_password(args.bitlocker_recovery_key)
+        except BitLockerError as e:
+            print(f"error: --bitlocker-recovery-key: {e}", file=sys.stderr)
+            return 2
+    creds = Credentials(recovery=args.bitlocker_recovery_key,
+                        password=args.bitlocker_password, bek=bek, fvek=fvek)
+    os.environ["CARVX_BITLOCKER"] = creds.to_env()
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+
+    rc = _setup_bitlocker(args)
+    if rc:
+        return rc
 
     if args.list_types:
         print(f"{'type':<8} {'magic(s)':<40} max size")

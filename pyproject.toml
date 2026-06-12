@@ -10,6 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 
+[project.optional-dependencies]
+# Optional accelerator. carvx decrypts BitLocker with zero deps (pure-Python
+# AES); installing cryptography swaps in C-backed AES for a large speedup.
+bitlocker = ["cryptography>=3.0"]
+
 [project.scripts]
 carvx = "carvx.cli:main"
 

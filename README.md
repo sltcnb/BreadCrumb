@@ -192,11 +192,38 @@ Inherent carving limits (same for PhotoRec):
 - Only **contiguous** files recover intact — fragmented files yield the first
   fragment plus junk.
 - NTFS-compressed or EFS-encrypted files are not in raw format on disk.
-- Full-disk encryption (BitLocker/LUKS/FileVault): carve the **unlocked**
-  device, not the raw one.
+- Full-disk encryption: **BitLocker is unlocked transparently** when you
+  supply a credential (see below); LUKS/FileVault still need the unlocked
+  device.
 - TRIM'd SSD blocks read back as zeros — unrecoverable by any tool.
 - No filenames/timestamps — that requires filesystem metadata recovery
   (Sleuth Kit `fls`/`icat` territory), not carving.
+
+## BitLocker (Windows FVE)
+
+carvx decrypts BitLocker volumes **in place**: supply a credential and the
+locked volume reads back as plaintext NTFS at the same offset, so carving,
+the `--ntfs`/`--auto` undelete modes, `--grep`, and `--list-partitions` all
+work as if the disk were never encrypted.
+
+```bash
+# carve a recovery-key-protected SSD image (XTS-AES, the Win10/11 default)
+carvx disk.E01 --bitlocker-recovery-key 471806-...-635835 -o out
+
+# whole-disk auto mode: detect the BitLocker partition, unlock, undelete NTFS
+carvx /dev/sdb --auto --bitlocker-recovery-key 471806-...-635835
+
+# other protectors
+carvx disk.dd --bitlocker-password 'Hunter2!'        # user passphrase
+carvx disk.dd --bitlocker-bek startup.BEK            # startup key file
+carvx disk.dd --bitlocker-fvek 0011aabb...           # raw FVEK (hex)
+```
+
+Supported ciphers: AES-XTS-128/256 (Windows 8+/10/11, incl. SSDs),
+AES-CBC-128/256, and AES-CBC + Elephant diffuser (Vista/7). Suspended volumes
+(clear-key protector) unlock with no credential. Decryption is pure-Python and
+read-only; installing the optional `cryptography` package (`pip install
+carvx[bitlocker]`) swaps in C-backed AES for a large speedup.
 
 ## Notes
 

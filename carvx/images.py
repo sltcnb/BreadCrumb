@@ -23,6 +23,90 @@ import zlib
 
 from .reader import Reader
 
+# BitLocker (FVE) transparent decryption layer; see bitlocker.py.
+
+
+class BitLockerDecryptingReader:
+    """Pass-through reader that decrypts BitLocker volume region(s) in place.
+
+    Absolute offsets are preserved: a locked volume at byte `base` reads back as
+    its plaintext NTFS, so partition parsing, --offset, and --auto all keep
+    working unchanged. Bytes outside any unlocked volume pass through verbatim.
+    """
+
+    def __init__(self, base_reader, volumes):
+        self.reader = base_reader
+        self.size = base_reader.size
+        self.is_device = getattr(base_reader, "is_device", False)
+        self.path = base_reader.path
+        self.volumes = sorted(volumes, key=lambda v: v.base)
+
+    def _vol_at(self, pos):
+        for v in self.volumes:
+            if v.base <= pos < v.base + v.size:
+                return v
+        return None
+
+    def _next_base(self, pos, end):
+        nxt = end
+        for v in self.volumes:
+            if pos < v.base < nxt:
+                nxt = v.base
+        return nxt
+
+    def pread(self, offset, length):
+        if offset >= self.size or length <= 0:
+            return b""
+        length = min(length, self.size - offset)
+        out = bytearray()
+        pos, end = offset, offset + length
+        while pos < end:
+            vol = self._vol_at(pos)
+            if vol:
+                vend = min(end, vol.base + vol.size)
+                out += vol.read(pos - vol.base, vend - pos)
+                pos = vend
+            else:
+                nxt = self._next_base(pos, end)
+                out += self.reader.pread(pos, nxt - pos)
+                pos = nxt
+        return bytes(out)
+
+    def close(self):
+        self.reader.close()
+
+    def __enter__(self): return self
+    def __exit__(self, *a): self.close()
+
+
+def scan_bitlocker(reader, creds):
+    """Find BitLocker volumes (whole-disk + each partition) and unlock them."""
+    from . import bitlocker
+    from .partition import parse
+
+    bases = set()
+    if bitlocker.is_bitlocker(reader, 0):
+        bases.add(0)
+    try:
+        for p in parse(reader):
+            if p.start and bitlocker.is_bitlocker(reader, p.start):
+                bases.add(p.start)
+    except Exception:
+        pass
+
+    def _log(msg):
+        print(msg, file=sys.stderr)
+
+    vols = []
+    for base in sorted(bases):
+        try:
+            v = bitlocker.unlock_volume(reader, base, creds, log=_log)
+            if v:
+                vols.append(v)
+        except bitlocker.BitLockerError as e:
+            print(f"bitlocker: volume @ {base:#x}: {e}", file=sys.stderr)
+    return vols
+
 
 def _u32be(b, o=0): return int.from_bytes(b[o:o + 4], "big")
 def _u64be(b, o=0): return int.from_bytes(b[o:o + 8], "big")
@@ -461,7 +545,20 @@ class StdinReader(Reader):
 # ---------------------------------------------------------------- factory
 
 def open_source(path: str):
-    """Detect the image format and return an appropriate reader."""
+    """Detect the image format, then transparently decrypt BitLocker volumes if
+    a credential is configured (env CARVX_BITLOCKER); else return the raw reader."""
+    reader = _open_raw(path)
+    from . import bitlocker
+    creds = bitlocker.Credentials.from_env()
+    if creds:
+        vols = scan_bitlocker(reader, creds)
+        if vols:
+            return BitLockerDecryptingReader(reader, vols)
+    return reader
+
+
+def _open_raw(path: str):
+    """Detect the image format and return an appropriate (still-encrypted) reader."""
     if path == "-" or path == "/dev/stdin":
         return StdinReader()
     # Split raw by name pattern (.001 etc.) only when a sibling .002 exists, so
