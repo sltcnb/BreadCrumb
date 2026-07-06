@@ -9,7 +9,7 @@ from the repo root — no bundled copy — so it always matches the CLI.
 cd web
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
-venv/bin/python app/main.py
+venv/bin/python -m carvx_web
 
 # open http://127.0.0.1:5050
 ```
@@ -18,7 +18,13 @@ Binds to `127.0.0.1` by default. To expose on the network (only on a
 trusted LAN — there is no authentication):
 
 ```bash
-CARVX_WEB_HOST=0.0.0.0 PORT=8080 venv/bin/python app/main.py
+CARVX_WEB_HOST=0.0.0.0 PORT=8080 venv/bin/python -m carvx_web
+```
+
+Behind a real WSGI server:
+
+```bash
+venv/bin/gunicorn wsgi:app
 ```
 
 ## Features
