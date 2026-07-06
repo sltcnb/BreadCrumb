@@ -1,1062 +1,643 @@
 <!DOCTYPE html>
-<html lang="en" class="no-js">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CarvX Web - Signature-based File Carver</title>
+    <title>CarvX — Signature-based File Carver</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <style>
         :root {
-            --md-primary-fg-color: #000000;
-            --md-primary-fg-color--light: #333333;
-            --md-primary-fg-color--dark: #000000;
-            --md-accent-fg-color: #000000;
-            --md-accent-fg-color--transparent: #0000001a;
-            --md-default-bg-color: #ffffff;
-            --md-default-fg-color: #000000;
-            --md-default-fg-color--light: #666666;
-            --md-default-fg-color--lighter: #999999;
-            --md-default-fg-color--lightest: #dddddd;
-            --md-shadow-z1: 0 0.2rem 0.5rem rgba(0,0,0,.1), 0 0 0.05rem rgba(0,0,0,.1);
-            --md-shadow-z2: 0 0.2rem 0.5rem rgba(0,0,0,.2), 0 0 0.05rem rgba(0,0,0,.25);
-            --md-shadow-z3: 0 0.2rem 0.5rem rgba(0,0,0,.3), 0 0 0.05rem rgba(0,0,0,.35);
+            --bg: #f6f7f9;
+            --surface: #ffffff;
+            --surface-2: #f0f1f4;
+            --border: #e2e5ea;
+            --fg: #1a1d23;
+            --fg-muted: #5c6470;
+            --fg-faint: #8b93a1;
+            --primary: #2f6feb;
+            --primary-fg: #ffffff;
+            --primary-soft: #e8f0fe;
+            --green: #1a7f37;
+            --green-soft: #e6f4ea;
+            --amber: #9a6700;
+            --amber-soft: #fff5e0;
+            --red: #cf222e;
+            --red-soft: #fde8e8;
+            --radius: 10px;
+            --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.1);
+            --shadow-lg: 0 4px 16px rgba(16,24,40,.12);
         }
-
         [data-md-color-scheme="slate"] {
-            --md-primary-fg-color: #ffffff;
-            --md-primary-fg-color--light: #cccccc;
-            --md-primary-fg-color--dark: #000000;
-            --md-accent-fg-color: #ffffff;
-            --md-default-bg-color: #1e1e1e;
-            --md-default-fg-color: #ffffff;
-            --md-default-fg-color--light: #aaaaaa;
-            --md-default-fg-color--lighter: #888888;
-            --md-default-fg-color--lightest: #444444;
+            --bg: #0f1115;
+            --surface: #171a21;
+            --surface-2: #1e222b;
+            --border: #2a2f3a;
+            --fg: #e6e9ef;
+            --fg-muted: #9aa3b2;
+            --fg-faint: #6b7280;
+            --primary: #4d8bff;
+            --primary-soft: #17233d;
+            --green-soft: #12251a;
+            --amber-soft: #2a2411;
+            --red-soft: #2c1618;
+            --shadow: none;
+            --shadow-lg: 0 8px 24px rgba(0,0,0,.4);
         }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; scroll-padding-top: 4rem; }
         body {
-            background: var(--md-default-bg-color);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            color: var(--md-default-fg-color);
-            background: var(--md-default-bg-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 15px; line-height: 1.55;
+            color: var(--fg); background: var(--bg);
             -webkit-font-smoothing: antialiased;
         }
+        code { font-family: 'Roboto Mono', monospace; font-size: .85em;
+            background: var(--surface-2); padding: .1em .4em; border-radius: 4px; }
+        a { color: var(--primary); }
 
         /* Header */
-        .md-header {
-            background: var(--md-primary-fg-color);
-            color: white;
-            padding: 0 1rem;
-            height: 2.4rem;
-            display: flex;
-            align-items: center;
-            box-shadow: var(--md-shadow-z1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
+        .header {
+            position: sticky; top: 0; z-index: 50;
+            display: flex; align-items: center; gap: 1rem;
+            height: 3.25rem; padding: 0 1.25rem;
+            background: var(--surface); border-bottom: 1px solid var(--border);
         }
-
-        .md-header__inner {
-            display: flex;
-            align-items: center;
-            width: 100%;
-            max-width: 1440px;
-            margin: 0 auto;
-        }
-
-        .md-header__title {
-            font-size: 1.1rem;
-            font-weight: 400;
-            letter-spacing: -0.01em;
-        }
-
-        .md-header__nav {
-            margin-left: 2rem;
-            display: flex;
-            gap: 1rem;
-        }
-
-        .md-header__nav a {
-            color: white;
+        .header__brand { display: flex; align-items: center; gap: .55rem;
+            font-weight: 700; font-size: 1.05rem; letter-spacing: -.01em; }
+        .header__brand .mdi { color: var(--primary); font-size: 1.4rem; }
+        .header__brand small { font-weight: 400; color: var(--fg-faint); font-size: .8rem; }
+        .header__spacer { margin-left: auto; }
+        .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 2.1rem; height: 2.1rem; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--surface); color: var(--fg-muted);
+            cursor: pointer; font-size: 1.15rem; transition: .15s;
             text-decoration: none;
-            opacity: 0.8;
-            font-size: 0.9rem;
-            padding: 0.5rem;
-            transition: opacity 0.2s;
         }
+        .icon-btn:hover { color: var(--fg); border-color: var(--fg-faint); }
 
-        .md-header__nav a:hover {
-            opacity: 1;
+        /* Layout */
+        .layout {
+            display: grid; grid-template-columns: 220px 1fr;
+            gap: 2rem; max-width: 1180px; margin: 0 auto;
+            padding: 1.75rem 1.25rem 6rem;
         }
+        .nav { position: sticky; top: 4.5rem; align-self: start; }
+        .nav__heading {
+            font-size: .7rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: var(--fg-faint);
+            margin: 0 0 .5rem .65rem;
+        }
+        .nav a {
+            display: flex; align-items: center; gap: .6rem;
+            padding: .45rem .65rem; margin-bottom: .1rem;
+            color: var(--fg-muted); text-decoration: none;
+            border-radius: 8px; font-size: .88rem; font-weight: 500;
+            transition: .12s;
+        }
+        .nav a .num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 1.35rem; height: 1.35rem; border-radius: 50%;
+            background: var(--surface-2); font-size: .72rem; font-weight: 700;
+            color: var(--fg-faint); flex-shrink: 0;
+        }
+        .nav a:hover { background: var(--surface-2); color: var(--fg); }
+        .nav a.active { background: var(--primary-soft); color: var(--primary); }
+        .nav a.active .num { background: var(--primary); color: #fff; }
+        .nav__sep { height: 1px; background: var(--border); margin: .75rem .5rem; }
 
-        .md-header__controls {
-            margin-left: auto;
-            display: flex;
-            gap: 0.5rem;
-        }
+        .main { min-width: 0; }
 
-        .md-icon-button {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            padding: 0.5rem;
-            opacity: 0.8;
-            transition: opacity 0.2s;
+        /* Cards / sections */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 1.5rem; margin-bottom: 1.25rem;
         }
+        .card > h2 {
+            display: flex; align-items: center; gap: .6rem;
+            font-size: 1.15rem; font-weight: 650; margin-bottom: 1rem;
+            scroll-margin-top: 4.5rem;
+        }
+        .card > h2 .step {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 1.6rem; height: 1.6rem; border-radius: 50%;
+            background: var(--primary-soft); color: var(--primary);
+            font-size: .8rem; font-weight: 700;
+        }
+        .hero { padding: 1.75rem; }
+        .hero h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; margin-bottom: .4rem; }
+        .hero p { color: var(--fg-muted); max-width: 60ch; }
 
-        .md-icon-button:hover {
-            opacity: 1;
-        }
-
-        /* Container */
-        .md-container {
-            max-width: 1440px;
-            margin: 0 auto;
-            padding: 2rem;
-            display: grid;
-            grid-template-columns: 1fr 3fr;
-            gap: 2rem;
-        }
-
-        .md-sidebar {
-            position: sticky;
-            top: 2rem;
-            height: calc(100vh - 5rem);
-            overflow-y: auto;
-            padding-right: 1rem;
-        }
-
-        .md-sidebar__scrollwrap {
-            padding: 1rem 0;
-        }
-
-        .md-sidebar__section {
-            margin-bottom: 1.5rem;
-        }
-
-        .md-sidebar__heading {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--md-default-fg-color--light);
-            margin-bottom: 0.5rem;
-            padding-left: 0.5rem;
-        }
-
-        .md-sidebar__link {
-            display: block;
-            padding: 0.4rem 0.5rem;
-            color: var(--md-default-fg-color);
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            transition: background 0.2s;
-        }
-
-        .md-sidebar__link:hover {
-            background: var(--md-default-fg-color--lightest);
-        }
-
-        .md-sidebar__link.active {
-            background: var(--md-primary-fg-color--light);
-            color: white;
-        }
-
-        /* Main */
-        .md-main {
-            min-width: 0;
-        }
-
-        .md-content {
-            background: var(--md-default-bg-color);
-            border-radius: 4px;
-            box-shadow: var(--md-shadow-z1);
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .md-content h1 {
-            font-size: 2rem;
-            font-weight: 300;
-            margin-bottom: 1rem;
-            color: var(--md-default-fg-color);
-        }
-
-        .md-content h2 {
-            font-size: 1.5rem;
-            font-weight: 300;
-            margin: 1.5rem 0 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 0.05rem solid var(--md-default-fg-color--lightest);
-        }
-
-        .md-content h3 {
-            font-size: 1.25rem;
-            font-weight: 400;
-            margin: 1.25rem 0 0.75rem;
-        }
-
-        .md-content p {
-            margin-bottom: 1rem;
-        }
-
-        /* Cards */
-        .md-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
-        }
-
-        .md-card {
-            background: var(--md-default-bg-color);
-            border: 0.05rem solid var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-            padding: 1.25rem;
-            transition: box-shadow 0.2s;
-        }
-
-        .md-card:hover {
-            box-shadow: var(--md-shadow-z2);
-        }
-
-        .md-card__icon {
-            font-size: 2rem;
-            color: var(--md-primary-fg-color);
-            margin-bottom: 0.75rem;
-        }
-
-        .md-card__title {
-            font-size: 1rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-
-        .md-card__text {
-            font-size: 0.85rem;
-            color: var(--md-default-fg-color--light);
-            margin-bottom: 0.75rem;
-        }
-
-        .md-card__link {
-            color: var(--md-primary-fg-color);
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        /* Forms */
-        .md-form {
-            margin-bottom: 1rem;
-        }
-
-        .md-form label {
-            display: block;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--md-default-fg-color--light);
-            margin-bottom: 0.5rem;
-        }
-
-        .md-form input[type="text"],
-        .md-form input[type="number"],
-        .md-form input[type="password"],
-        .md-form select {
-            width: 100%;
-            padding: 0.6rem 0.8rem;
-            border: 0.05rem solid var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            background: var(--md-default-bg-color);
-            color: var(--md-default-fg-color);
-            transition: border-color 0.2s;
-        }
-
-        .md-form input:focus,
-        .md-form select:focus {
-            outline: none;
-            border-color: var(--md-primary-fg-color);
-        }
-
-        .md-form-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 0;
-        }
-
-        .md-form-checkbox input {
-            width: 1rem;
-            height: 1rem;
-        }
-
-        .md-form-checkbox label {
-            margin: 0;
-            cursor: pointer;
-        }
-
-        /* Buttons */
-        .md-button {
-            display: inline-block;
-            padding: 0.6rem 1.2rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            text-decoration: none;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .md-button--primary {
-            background: var(--md-primary-fg-color);
-            color: white;
-        }
-
-        .md-button--primary:hover {
-            background: var(--md-primary-fg-color--dark);
-        }
-
-        .md-button--secondary {
-            background: var(--md-default-fg-color--lightest);
-            color: var(--md-default-fg-color);
-        }
-
-        .md-button--secondary:hover {
-            background: var(--md-default-fg-color--lighter);
-        }
-
-        .md-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Dropzone */
-        .md-dropzone {
-            border: 0.1rem dashed var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .md-dropzone:hover,
-        .md-dropzone.dragover {
-            border-color: var(--md-primary-fg-color);
-            background: var(--md-primary-fg-color--light);
-        }
-
-        .md-dropzone__icon {
-            font-size: 3rem;
-            color: var(--md-primary-fg-color);
-            margin-bottom: 0.5rem;
-        }
-
-        .md-dropzone__text {
-            color: var(--md-default-fg-color--light);
-        }
-
-        /* Checkbox grid */
-        .md-checkbox-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 0.5rem;
-            max-height: 300px;
-            overflow-y: auto;
-            padding: 0.5rem;
-            border: 0.05rem solid var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-        }
-
-        /* Mode buttons */
-        .md-mode-select {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-
-        .md-mode-btn {
-            padding: 0.5rem 1rem;
-            border: 0.05rem solid var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-            background: var(--md-default-bg-color);
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-
-        .md-mode-btn:hover {
-            border-color: var(--md-primary-fg-color);
-        }
-
-        .md-mode-btn.active {
-            background: var(--md-primary-fg-color);
-            color: white;
-            border-color: var(--md-primary-fg-color);
-        }
-
-        /* Admonitions */
-        .md-admonition {
-            padding: 1rem 1.2rem;
-            border-radius: 4px;
-            margin: 1rem 0;
-            border-left: 0.2rem solid;
-        }
-
-        .md-admonition--tip {
-            background: #e8f5e9;
-            border-color: #4caf50;
-        }
-
-        .md-admonition--info {
-            background: #e3f2fd;
-            border-color: #2196f3;
-        }
-
-        .md-admonition--warning {
-            background: #fff3e0;
-            border-color: #ff9800;
-        }
-
-        .md-admonition__title {
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-
-        /* Progress */
-        .md-progress {
-            height: 0.25rem;
-            background: var(--md-default-fg-color--lightest);
-            border-radius: 2px;
-            overflow: hidden;
-            margin: 1rem 0;
-        }
-
-        .md-progress__fill {
-            height: 100%;
-            background: var(--md-primary-fg-color);
-            transition: width 0.3s;
-        }
-
-        /* Output */
-        .md-output {
-            background: #f5f5f5;
-            border: 0.05rem solid var(--md-default-fg-color--lightest);
-            border-radius: 4px;
-            padding: 1rem;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem;
-            max-height: 400px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            margin-top: 1rem;
-        }
+        .hint { font-size: .82rem; color: var(--fg-faint); margin-top: .3rem; }
+        .field-desc { font-size: .85rem; color: var(--fg-muted); margin-bottom: 1rem; }
 
         /* Tabs */
-        .md-tabs {
-            display: flex;
-            border-bottom: 0.05rem solid var(--md-default-fg-color--lightest);
-            margin-bottom: 1rem;
+        .tabs { display: inline-flex; gap: .25rem; padding: .25rem;
+            background: var(--surface-2); border-radius: 9px; margin-bottom: 1rem; }
+        .tab { padding: .4rem .9rem; border-radius: 7px; cursor: pointer;
+            font-size: .85rem; font-weight: 500; color: var(--fg-muted); transition: .12s; }
+        .tab:hover { color: var(--fg); }
+        .tab.active { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Dropzone */
+        .dropzone {
+            border: 1.5px dashed var(--border); border-radius: var(--radius);
+            padding: 2.25rem 1rem; text-align: center; cursor: pointer;
+            transition: .15s; background: var(--surface-2);
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--primary); background: var(--primary-soft);
+        }
+        .dropzone .mdi { font-size: 2.5rem; color: var(--primary); }
+        .dropzone__text { color: var(--fg-muted); font-weight: 500; }
+        .dropzone__sub { font-size: .8rem; color: var(--fg-faint); margin-top: .4rem; }
+
+        /* Forms */
+        label.lbl { display: block; font-size: .82rem; font-weight: 600;
+            color: var(--fg); margin-bottom: .35rem; }
+        input[type=text], input[type=number], input[type=password], select {
+            width: 100%; padding: .55rem .7rem; font-size: .9rem; font-family: inherit;
+            color: var(--fg); background: var(--surface);
+            border: 1px solid var(--border); border-radius: 8px; transition: .12s;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-soft); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+            gap: 1rem; }
+
+        /* Checkbox row */
+        .check { display: flex; align-items: flex-start; gap: .55rem;
+            padding: .5rem .65rem; border-radius: 8px; cursor: pointer; transition: .1s; }
+        .check:hover { background: var(--surface-2); }
+        .check input { width: 1.05rem; height: 1.05rem; margin-top: .12rem;
+            accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+        .check label { cursor: pointer; font-size: .88rem; }
+        .check label small { display: block; color: var(--fg-faint); font-size: .78rem; }
+
+        /* Mode selector */
+        .modes { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+        .mode-btn { padding: .5rem .9rem; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--surface); cursor: pointer;
+            font-size: .85rem; font-weight: 500; color: var(--fg-muted); transition: .12s; }
+        .mode-btn:hover { border-color: var(--primary); color: var(--fg); }
+        .mode-btn.active { background: var(--primary); border-color: var(--primary);
+            color: #fff; }
+        .panel {
+            border: 1px solid var(--border); border-left: 3px solid var(--primary);
+            background: var(--surface-2); border-radius: 8px; padding: 1rem 1.1rem;
+            font-size: .88rem;
+        }
+        .panel h3 { font-size: .95rem; margin-bottom: .5rem; }
+        .panel p { margin-bottom: .5rem; color: var(--fg-muted); }
+        .panel p:last-child { margin-bottom: 0; }
+        .panel strong { color: var(--fg); }
+
+        /* Type filter */
+        .types-bar { display: flex; align-items: center; gap: .75rem;
+            margin-bottom: .75rem; flex-wrap: wrap; }
+        .types-bar input[type=text] { flex: 1; min-width: 180px; }
+        .types-count { font-size: .8rem; color: var(--fg-faint); white-space: nowrap; }
+        .types-grid {
+            display: grid; grid-template-columns: repeat(auto-fill,minmax(190px,1fr));
+            gap: .1rem; max-height: 320px; overflow-y: auto;
+            border: 1px solid var(--border); border-radius: 8px; padding: .4rem;
         }
 
-        .md-tab {
-            padding: 0.75rem 1.5rem;
-            cursor: pointer;
-            border-bottom: 0.125rem solid transparent;
-            margin-bottom: -0.05rem;
-            transition: all 0.2s;
-            font-size: 0.9rem;
-            color: var(--md-default-fg-color--light);
-        }
+        /* Collapsible help */
+        details.help { margin-top: 1rem; border: 1px solid var(--border);
+            border-radius: 8px; overflow: hidden; }
+        details.help summary { cursor: pointer; padding: .6rem .9rem; font-size: .85rem;
+            font-weight: 500; color: var(--fg-muted); list-style: none;
+            display: flex; align-items: center; gap: .4rem; user-select: none; }
+        details.help summary::-webkit-details-marker { display: none; }
+        details.help summary::before { content: "\F0142"; font-family: "Material Design Icons";
+            transition: transform .15s; }
+        details.help[open] summary::before { transform: rotate(90deg); }
+        details.help summary:hover { color: var(--fg); }
+        details.help .help-body { padding: 0 .9rem .9rem; font-size: .85rem;
+            color: var(--fg-muted); }
+        details.help .help-body dt { font-weight: 600; color: var(--fg); margin-top: .6rem; }
 
-        .md-tab:hover {
-            color: var(--md-primary-fg-color);
-        }
+        /* Buttons */
+        .btn { display: inline-flex; align-items: center; gap: .5rem;
+            padding: .6rem 1.15rem; font-size: .9rem; font-weight: 600;
+            border: 1px solid transparent; border-radius: 9px; cursor: pointer;
+            text-decoration: none; transition: .12s; }
+        .btn--primary { background: var(--primary); color: #fff; }
+        .btn--primary:hover { filter: brightness(1.07); }
+        .btn--secondary { background: var(--surface); color: var(--fg);
+            border-color: var(--border); }
+        .btn--secondary:hover { background: var(--surface-2); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-        .md-tab.active {
-            color: var(--md-primary-fg-color);
-            border-bottom-color: var(--md-primary-fg-color);
-        }
+        /* Run bar */
+        .runbar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 
-        .md-tab-content {
-            display: none;
-        }
+        /* Progress */
+        .progress { height: .5rem; background: var(--surface-2);
+            border-radius: 999px; overflow: hidden; margin: 1rem 0 .5rem; }
+        .progress__fill { height: 100%; background: var(--primary);
+            transition: width .3s; width: 0; border-radius: 999px; }
+        #status-text { font-size: .85rem; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
 
-        .md-tab-content.active {
-            display: block;
-        }
+        /* Status blocks */
+        .status { padding: .85rem 1rem; border-radius: 9px; font-size: .9rem;
+            border-left: 3px solid var(--fg-faint); background: var(--surface-2); }
+        .status--running { border-color: var(--primary); background: var(--primary-soft); }
+        .status--completed { border-color: var(--green); background: var(--green-soft); }
+        .status--failed { border-color: var(--red); background: var(--red-soft); }
 
-        /* Status */
-        .md-status {
-            padding: 1rem 1.2rem;
-            border-radius: 4px;
-            margin: 1rem 0;
-        }
+        .output { background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 8px; padding: .9rem; font-family: 'Roboto Mono', monospace;
+            font-size: .78rem; max-height: 380px; overflow: auto; white-space: pre-wrap;
+            margin-top: 1rem; color: var(--fg-muted); }
 
-        .md-status--running {
-            background: #e3f2fd;
-            border-left: 0.2rem solid #2196f3;
-        }
+        .hidden { display: none !important; }
 
-        .md-status--completed {
-            background: #e8f5e9;
-            border-left: 0.2rem solid #4caf50;
-        }
+        ::-webkit-scrollbar { width: .55rem; height: .55rem; }
+        ::-webkit-scrollbar-thumb { background: var(--fg-faint); border-radius: 999px;
+            border: 2px solid var(--surface); }
+        ::-webkit-scrollbar-track { background: transparent; }
 
-        .md-status--failed {
-            background: #ffebee;
-            border-left: 0.2rem solid #f44336;
-        }
-
-        /* Table */
-        .md-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            margin: 1rem 0;
-        }
-
-        .md-table th,
-        .md-table td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 0.05rem solid var(--md-default-fg-color--lightest);
-        }
-
-        .md-table th {
-            background: var(--md-default-fg-color--lightest);
-            font-weight: 500;
-            color: var(--md-default-fg-color--light);
-        }
-
-        .md-table tr:hover {
-            background: var(--md-default-fg-color--lightest);
-        }
-
-        /* Badge */
-        .md-badge {
-            display: inline-block;
-            padding: 0.2em 0.6em;
-            border-radius: 3px;
-            font-size: 0.75em;
-            font-weight: 600;
-        }
-
-        .md-badge--high { background: #e3f2fd; color: #1565c0; }
-        .md-badge--low { background: #fff3e0; color: #ef6c00; }
-        .md-badge--verified { background: #e8f5e9; color: #2e7d32; }
-
-        /* Hidden */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 0.5rem;
-            height: 0.5rem;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--md-default-fg-color--lightest);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--md-default-fg-color--lighter);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--md-default-fg-color--light);
+        @media (max-width: 820px) {
+            .layout { grid-template-columns: 1fr; }
+            .nav { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="md-container">
-        <aside class="md-sidebar">
-            <div class="md-sidebar__scrollwrap">
-                <div class="md-sidebar__section">
-                    <div class="md-sidebar__heading">Steps</div>
-                    <a href="#step1" class="md-sidebar__link active">1. Input Source</a>
-                    <a href="#step2" class="md-sidebar__link">2. Carving Mode</a>
-                    <a href="#step3" class="md-sidebar__link">3. File Types</a>
-                    <a href="#step4" class="md-sidebar__link">4. Advanced Options</a>
-                    <a href="#step5" class="md-sidebar__link">5. BitLocker</a>
-                    <a href="#step6" class="md-sidebar__link">6. Run</a>
+    <header class="header">
+        <div class="header__brand">
+            <span class="mdi mdi-magnify-scan"></span> CarvX
+            <small>file carver &amp; undelete</small>
+        </div>
+        <div class="header__spacer"></div>
+        <a class="icon-btn" href="https://github.com/carvx/carvx" title="GitHub" target="_blank" rel="noopener">
+            <span class="mdi mdi-github"></span>
+        </a>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">
+            <span class="mdi mdi-weather-night"></span>
+        </button>
+    </header>
+
+    <div class="layout">
+        <nav class="nav">
+            <div class="nav__heading">Steps</div>
+            <a href="#step1"><span class="num">1</span> Input source</a>
+            <a href="#step2"><span class="num">2</span> Carving mode</a>
+            <a href="#step3"><span class="num">3</span> File types</a>
+            <a href="#step4"><span class="num">4</span> Options</a>
+            <a href="#step5"><span class="num">5</span> BitLocker</a>
+            <a href="#step6"><span class="num">6</span> Run</a>
+        </nav>
+
+        <main class="main">
+            <div class="card hero">
+                <h1>Recover files from disk images</h1>
+                <p>Signature-based carver and filesystem-aware undelete for disk images and block devices. Point it at an image, pick a mode, and recover deleted files.</p>
+            </div>
+
+            <!-- 1. Input -->
+            <div class="card">
+                <h2 id="step1"><span class="step">1</span> Input source</h2>
+                <div class="tabs">
+                    <div class="tab active" data-tab="upload">Upload file</div>
+                    <div class="tab" data-tab="path">Existing path</div>
                 </div>
-                <div class="md-sidebar__section">
-                    <div class="md-sidebar__heading">Resources</div>
-                    <a href="https://github.com/carvx/carvx" class="md-sidebar__link">GitHub</a>
-                    <a href="#" class="md-sidebar__link">Documentation</a>
-                    <a href="#" class="md-sidebar__link">API Reference</a>
+
+                <div class="tab-content active" id="upload-tab">
+                    <div class="dropzone" id="dropzone">
+                        <div><span class="mdi mdi-tray-arrow-up"></span></div>
+                        <p class="dropzone__text">Drag &amp; drop a disk image, or click to browse</p>
+                        <p class="dropzone__sub">dd · img · iso · e01 · raw · bin · aff · vmdk · qcow2 · vdi · split segments</p>
+                    </div>
+                    <input type="file" id="file-input" multiple accept=".dd,.img,.iso,.e01,.raw,.bin,.aff,.vmdk,.qcow2,.vdi" style="display:none">
+                    <div id="file-info" class="status hidden" style="margin-top:1rem"></div>
+                </div>
+
+                <div class="tab-content" id="path-tab">
+                    <label class="lbl" for="file-path">Path to disk image</label>
+                    <input type="text" id="file-path" placeholder="/path/to/image.dd">
+                    <p class="hint">Referenced in place — large images are never copied.</p>
+                    <button class="btn btn--secondary" id="load-path-btn" style="margin-top:.75rem">Load path</button>
+                    <div id="path-info" class="status hidden" style="margin-top:1rem"></div>
                 </div>
             </div>
-        </aside>
 
-        <main class="md-main">
-            <div class="md-content">
-                <h1>CarvX Web Wrap</h1>
-                <p>Signature-based file carver for disk images and block devices. Upload a disk image, configure options, and recover deleted files.</p>
-
-                <div class="md-admonition md-admonition--tip">
-                    <div class="md-admonition__title">Quick Start</div>
-                    <p>Upload a disk image (dd, img, iso, e01, etc.), select file types to recover, and click Run. Carved files will be available for download when complete.</p>
+            <!-- 2. Mode -->
+            <div class="card">
+                <h2 id="step2"><span class="step">2</span> Carving mode</h2>
+                <div class="modes">
+                    <button class="mode-btn active" data-mode="carve">Signature carve</button>
+                    <button class="mode-btn" data-mode="ntfs">NTFS</button>
+                    <button class="mode-btn" data-mode="ext4">ext4</button>
+                    <button class="mode-btn" data-mode="fat">FAT</button>
+                    <button class="mode-btn" data-mode="hfs">HFS+</button>
+                    <button class="mode-btn" data-mode="apfs">APFS</button>
+                    <button class="mode-btn" data-mode="auto">Auto-detect</button>
                 </div>
+                <div class="panel" id="mode-panel"></div>
+            </div>
 
-                <hr style="border: none; border-top: 0.05rem solid var(--md-default-fg-color--lightest); margin: 1.5rem 0;">
-
-                <h2 id="step1">1. Input Source</h2>
-                <div class="md-tabs">
-                    <div class="md-tab active" data-tab="upload">Upload File</div>
-                    <div class="md-tab" data-tab="path">Existing Path</div>
-                </div>
-
-                <div class="md-tab-content active" id="upload-tab">
-                    <div class="md-dropzone" id="dropzone">
-                        <div class="md-dropzone__icon"><span class="mdi mdi-folder-upload"></span></div>
-                        <p class="md-dropzone__text">Drag and drop your disk image here</p>
-                        <p class="md-dropzone__text">or click to browse</p>
-                        <p style="font-size: 0.8rem; opacity: 0.7; margin-top: 0.5rem;">
-                            Supported: dd, img, iso, e01, raw, bin, aff, vmdk, qcow2, vdi
-                        </p>
-                    </div>
-                    <input type="file" id="file-input" multiple accept=".dd,.img,.iso,.e01,.raw,.bin,.aff,.vmdk,.qcow2,.vdi" style="display: none;">
-                    <div id="file-info" class="md-status hidden" style="margin-top: 1rem;"></div>
-                </div>
-
-                <div class="md-tab-content" id="path-tab">
-                    <div class="md-form">
-                        <label for="file-path">Path to disk image</label>
-                        <input type="text" id="file-path" placeholder="/path/to/image.dd">
-                    </div>
-                    <button class="md-button md-button--secondary" id="load-path-btn">Load Path</button>
-                    <div id="path-info" class="md-status hidden" style="margin-top: 1rem;"></div>
-                </div>
-
-                <h2 id="step2">2. Carving Mode</h2>
-                <div class="md-mode-select">
-                    <button class="md-mode-btn active" data-mode="carve">Signature Carve</button>
-                    <button class="md-mode-btn" data-mode="ntfs">NTFS</button>
-                    <button class="md-mode-btn" data-mode="ext4">ext4</button>
-                    <button class="md-mode-btn" data-mode="fat">FAT</button>
-                    <button class="md-mode-btn" data-mode="hfs">HFS+</button>
-                    <button class="md-mode-btn" data-mode="apfs">APFS</button>
-                    <button class="md-mode-btn" data-mode="auto">Auto</button>
-                </div>
-                
-                <div class="md-admonition md-admonition--info" id="mode-description">
-                    <div class="md-admonition__title">Signature Carve (Selected)</div>
-                    <p><strong>What it does:</strong> Scans raw bytes for file signatures (magic bytes) without relying on filesystem metadata. Completely filesystem-agnostic — works on raw images, corrupted filesystems, unallocated space, and unknown filesystem types.</p>
-                    <p><strong>Recovers:</strong> Contiguous files only, based on header/footer signatures. No original filenames or paths — files are named by offset (e.g., <code>jpg/f_0x1a2b3c.jpg</code>).</p>
-                    <p><strong>Limitations:</strong> Fragmented files yield only the first fragment. No filesystem metadata means no timestamps, no filenames, no directory structure. File boundaries are estimated from signatures and size heuristics.</p>
-                    <p><strong>Best for:</strong> Heavily damaged filesystems, formatted drives, unallocated space carving, unknown filesystem types, or when filesystem metadata is unavailable.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--warning hidden" id="mode-ntfs">
-                    <div class="md-admonition__title">NTFS Undelete Mode</div>
-                    <p><strong>What it does:</strong> Parses the NTFS Master File Table (MFT) to recover deleted file records. Reads file extents (data runs) directly from MFT entries and reconstructs files from their actual disk clusters.</p>
-                    <p><strong>Recovers:</strong> Original filenames, full directory paths, MACB timestamps (Modified, Accessed, Changed, Born), file attributes, and fragmented files (via MFT runlists). Files land in <code>ntfs/&lt;recovered_path&gt;</code> with original names.</p>
-                    <p><strong>Limitations:</strong> Requires intact MFT. Overwritten MFT entries or zeroed $MFT file = no recovery. Compressed/encrypted (EFS) streams not recovered in raw format. Best-effort on partially corrupted MFT.</p>
-                    <p><strong>Best for:</strong> NTFS volumes with deleted files where MFT survives. Recovers names + paths + timestamps, not just raw data. Use with BitLocker unlock if volume is encrypted.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--tip hidden" id="mode-ext4">
-                    <div class="md-admonition__title">ext2/3/4 Undelete Mode</div>
-                    <p><strong>What it does:</strong> Walks ext filesystem inodes and directory entries. Reads deleted inodes (marked free but not zeroed) and recovers filenames from directory entry slack space.</p>
-                    <p><strong>Recovers:</strong> Filenames from dirent slack, inode metadata, timestamps (mtime, ctime, atime), file permissions, and fragmented files (via extent trees or indirect blocks). Files recovered with original names where dirent slack survives.</p>
-                    <p><strong>Limitations:</strong> ext4 aggressively zeros deleted inodes and dirents — older deletions may have no name recovery. Fragmented files require intact extent trees. Journaling may have overwritten deleted metadata.</p>
-                    <p><strong>Best for:</strong> Recent deletions on ext filesystems where inodes/dirents not yet zeroed. Name recovery is hit-or-miss on ext4; ext2/ext3 fare better.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info hidden" id="mode-fat">
-                    <div class="md-admonition__title">FAT12/16/32 + exFAT Undelete Mode</div>
-                    <p><strong>What it does:</strong> Scans FAT directory entries for deleted markers (0xE5). Reconstructs long filenames from VFAT LFN entries (or exFAT directory entries) and follows FAT cluster chains for file data.</p>
-                    <p><strong>Recovers:</strong> Original filenames (via VFAT LFN entries or exFAT name entries), timestamps (created, modified, accessed), file attributes, and first contiguous run of clusters. Files recovered with original names where LFN entries survive.</p>
-                    <p><strong>Limitations:</strong> Only recovers first contiguous fragment — fragmented FAT files are truncated at first gap. LFN entries often zeroed on deletion; may fall back to 8.3 short names. exFAT recovery similar but with different entry structures.</p>
-                    <p><strong>Best for:</strong> SD cards, USB drives, camera cards, embedded devices using FAT/exFAT. Quick recovery of recently deleted files with names intact.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--tip hidden" id="mode-hfs">
-                    <div class="md-admonition__title">HFS+/HFSX Undelete Mode</div>
-                    <p><strong>What it does:</strong> Walks the HFS+ catalog B-tree to find live and deleted file records. Parses fork data extents for file content and recovers metadata from catalog records.</p>
-                    <p><strong>Recovers:</strong> Original filenames, full POSIX paths, timestamps (created, modified, backed up, accessed), file/folder permissions, resource forks, and fragmented files (via extent records). Files recovered with names from catalog records.</p>
-                    <p><strong>Limitations:</strong> Clean unmounts journal away deleted catalog records — name recovery often impossible on cleanly unmounted volumes. File data still recoverable via carving mode. Catalog B-tree corruption blocks name recovery.</p>
-                    <p><strong>Best for:</strong> macOS volumes with deleted files where catalog records survive (unclean unmount, journal corruption). Data always recoverable; names only if catalog record persists.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info hidden" id="mode-apfs">
-                    <div class="md-admonition__title">APFS Recovery Mode</div>
-                    <p><strong>What it does:</strong> Scans APFS copy-on-write structures — file extents, directory records, and snapshot metadata. Recovers deleted files from superseded node copies that persist in unallocated space.</p>
-                    <p><strong>Recovers:</strong> Original filenames, full paths, precise timestamps (created, modified, changed, backed up, accessed), file clones, snapshots, and fragmented files (via extent lists). Exact file content via COW — no fragmentation issues.</p>
-                    <p><strong>Limitations:</strong> APFS TRIM can zero deleted blocks quickly on SSDs. Encryption (FileVault) requires unlocked volume. Snapshot-based recovery depends on snapshot age and retention.</p>
-                    <p><strong>Best for:</strong> Modern macOS volumes (10.13+). Best-in-class deleted file recovery due to COW nature — old node copies often survive long after deletion. Recovers exact file content with names and metadata.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--warning hidden" id="mode-auto">
-                    <div class="md-admonition__title">Auto-Detect + Undelete Mode</div>
-                    <p><strong>What it does:</strong> Automatically parses MBR/GPT/APM partition tables, detects filesystem type for each partition (via magic bytes and superblock parsing), and dispatches the appropriate undelete mode (or carving fallback) to each.</p>
-                    <p><strong>Recovers:</strong> Everything the individual modes recover — filenames, paths, timestamps, fragments — across all partitions in a single run. Each partition's output lands in <code>part&lt;N&gt;_&lt;fs&gt;/</code> subdirectories.</p>
-                    <p><strong>Workflow:</strong> 1) Parse partition table (MBR/GPT/APM). 2) Probe each partition for filesystem magic/superblock. 3) Run matching undelete mode (NTFS→MFT, ext4→inodes, FAT→dirents, etc.). 4) Fall back to signature carving for unrecognized filesystems.</p>
-                    <p><strong>Best for:</strong> Whole-disk images, multi-boot systems, unknown partition layouts, or when you want "everything recovered" without manual mode selection. Single command recovers all partitions.</p>
-                </div>
-
-                <h2 id="step3">3. File Types</h2>
-                <div class="md-form">
-                    <div class="md-form-checkbox">
+            <!-- 3. Types -->
+            <div class="card">
+                <h2 id="step3"><span class="step">3</span> File types</h2>
+                <p class="field-desc">Signature carve and Auto modes scan for these types. Filesystem undelete modes ignore this list.</p>
+                <div class="types-bar">
+                    <input type="text" id="types-filter" placeholder="Filter types…">
+                    <label class="check" style="padding:.4rem .5rem">
                         <input type="checkbox" id="select-all-types" checked>
-                        <label for="select-all-types">Select All</label>
-                    </div>
-                    <div class="md-checkbox-grid" id="types-container">
-                        {% for type in types %}
-                        <div class="md-form-checkbox">
-                            <input type="checkbox" name="type" id="type-{{ type.name }}" value="{{ type.name }}" checked>
-                            <label for="type-{{ type.name }}">{{ type.name }}{% if type.description %} - {{ type.description }}{% endif %}</label>
-                        </div>
-                        {% endfor %}
-                    </div>
+                        <label for="select-all-types" style="font-weight:600">Select all</label>
+                    </label>
+                    <span class="types-count" id="types-count"></span>
                 </div>
-
-                <h2 id="step4">4. Advanced Options</h2>
-                
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Offset</div>
-                    <p>Start position in the source image/device. Use suffixes: <code>100K</code> (kilobytes), <code>50M</code> (megabytes), <code>2G</code> (gigabytes). Default: <code>0</code> (start from beginning).</p>
-                    <p><strong>Use case:</strong> Skip known boot sectors, target specific partition regions, or carve only a suspicious area.</p>
+                <div class="types-grid" id="types-container">
+                    {% for type in types %}
+                    <label class="check" data-type-row data-name="{{ type.name|lower }} {{ type.description|lower }}">
+                        <input type="checkbox" name="type" id="type-{{ type.name }}" value="{{ type.name }}" checked>
+                        <label for="type-{{ type.name }}">{{ type.name }}{% if type.description %}<small>{{ type.description }}</small>{% endif %}</label>
+                    </label>
+                    {% endfor %}
                 </div>
+            </div>
 
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Length</div>
-                    <p>Number of bytes to scan from offset. Use suffixes: <code>100K</code>, <code>500M</code>, <code>1G</code>. Default: <code>0</code> (scan to end of source).</p>
-                    <p><strong>Use case:</strong> Limit scan to partition boundaries, specific clusters, or regions of interest identified by prior analysis.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Alignment</div>
-                    <p>Only accept file headers at N-byte aligned offsets. Common values: <code>1</code> (any offset), <code>512</code> (sector-aligned), <code>4096</code> (cluster-aligned on modern filesystems).</p>
-                    <p><strong>Effect:</strong> Faster scans with fewer false positives on known filesystem images. Misses embedded files or files on non-aligned boundaries. Use <code>1</code> for raw/carving mode, higher values for filesystem-structured images.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Parallel Jobs</div>
-                    <p>Number of concurrent scan processes. <code>0</code> = auto-detect (use all CPU cores). Default: <code>1</code>.</p>
-                    <p><strong>Trade-off:</strong> More jobs = faster scan on multi-core systems, but higher memory usage. Use <code>0</code> or core count for large images. Single job for small images or memory-constrained systems.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--tip" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Deep Validate Carves</div>
-                    <p>After carving, attempt full decode of each file: JPEG/PNG structure validation, ZIP central directory check, SQLite header + page integrity, gzip stream decode, etc.</p>
-                    <p><strong>Sets confidence:</strong> <code>verified</code> (decode succeeded), <code>failed</code> (decode failed), or <code>high</code> (not validated). Does not modify output files.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--warning" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Drop Failed Validations</div>
-                    <p>When enabled with <strong>Deep Validate</strong>, discard carved files that fail structure validation. Reduces output size by removing false positives and truncated files.</p>
-                    <p><strong>Warning:</strong> May discard partially recoverable files. Use only when you need high-confidence results and can afford to lose borderline carves.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Dry Run</div>
-                    <p>Scan and report findings without writing any carved files to disk. Outputs manifest JSON with offsets, sizes, and hashes, but no actual file recovery.</p>
-                    <p><strong>Use case:</strong> Quick assessment of recoverable content, estimate output size, or verify signatures match before full recovery.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Export CSV</div>
-                    <p>Write findings as CSV spreadsheet in addition to JSON manifest. Columns: type, extension, offset, size, SHA-256, validated, confidence, path.</p>
-                    <p><strong>Use case:</strong> Import into Excel, Splunk, or other tools for filtering, sorting, and correlation with other evidence.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">HTML Report</div>
-                    <p>Generate browsable HTML report with summary statistics, file table, and image gallery (for recovered JPEG/PNG/GIF/BMP files).</p>
-                    <p><strong>Use case:</strong> Shareable reports for non-technical stakeholders, quick visual review of recovered images, case documentation.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">Export Timeline</div>
-                    <p>Write sorted timeline of recovered file timestamps (MACB: Modified, Accessed, Changed, Born). Output as CSV or JSONL depending on extension.</p>
-                    <p><strong>Use case:</strong> Incident timeline reconstruction, correlation with other forensic artifacts (prefetch, shellbags, event logs), bodyfile for Sleuth Kit mactime.</p>
-                </div>
-
-                <div class="md-grid">
+            <!-- 4. Options -->
+            <div class="card">
+                <h2 id="step4"><span class="step">4</span> Options</h2>
+                <div class="grid">
                     <div>
-                        <div class="md-form">
-                            <label for="offset">Offset (start position)</label>
-                            <input type="text" id="offset" placeholder="0 (supports K/M/G)">
-                        </div>
+                        <label class="lbl" for="offset">Offset</label>
+                        <input type="text" id="offset" placeholder="0">
+                        <p class="hint">Start position. Suffixes K/M/G.</p>
                     </div>
                     <div>
-                        <div class="md-form">
-                            <label for="length">Length (bytes to scan)</label>
-                            <input type="text" id="length" placeholder="0 = to end">
-                        </div>
+                        <label class="lbl" for="length">Length</label>
+                        <input type="text" id="length" placeholder="0 = to end">
+                        <p class="hint">Bytes to scan. Suffixes K/M/G.</p>
                     </div>
                     <div>
-                        <div class="md-form">
-                            <label for="align">Alignment</label>
-                            <input type="number" id="align" value="1" min="1">
-                        </div>
+                        <label class="lbl" for="align">Alignment</label>
+                        <input type="number" id="align" value="1" min="1">
+                        <p class="hint">1 = any offset, 512/4096 = sector/cluster.</p>
                     </div>
                     <div>
-                        <div class="md-form">
-                            <label for="jobs">Parallel Jobs</label>
-                            <input type="number" id="jobs" value="1" min="0">
-                        </div>
+                        <label class="lbl" for="jobs">Parallel jobs</label>
+                        <input type="number" id="jobs" value="1" min="0">
+                        <p class="hint">0 = all CPU cores.</p>
                     </div>
                 </div>
 
-                <div class="md-grid">
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="validate">
-                        <label for="validate">Deep validate carves</label>
-                    </div>
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="drop-failed">
-                        <label for="drop-failed">Drop failed validations</label>
-                    </div>
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="dry-run">
-                        <label for="dry-run">Dry run (no output)</label>
-                    </div>
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="csv">
-                        <label for="csv">Export CSV</label>
-                    </div>
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="html">
-                        <label for="html">HTML report</label>
-                    </div>
-                    <div class="md-form-checkbox">
-                        <input type="checkbox" id="timeline">
-                        <label for="timeline">Export timeline</label>
-                    </div>
+                <div class="grid" style="margin-top:1rem; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.25rem">
+                    <label class="check"><input type="checkbox" id="validate"><label for="validate">Deep validate carves<small>Decode files to set confidence</small></label></label>
+                    <label class="check"><input type="checkbox" id="drop-failed"><label for="drop-failed">Drop failed validations<small>Discard carves that fail decode</small></label></label>
+                    <label class="check"><input type="checkbox" id="dry-run"><label for="dry-run">Dry run<small>Report findings, write nothing</small></label></label>
+                    <label class="check"><input type="checkbox" id="csv"><label for="csv">Export CSV<small>Findings as spreadsheet</small></label></label>
+                    <label class="check"><input type="checkbox" id="html"><label for="html">HTML report<small>Browsable report + gallery</small></label></label>
+                    <label class="check"><input type="checkbox" id="timeline"><label for="timeline">Export timeline<small>MACB timestamps, sorted</small></label></label>
                 </div>
 
-                <h2 id="step5">5. BitLocker (Optional)</h2>
+                <details class="help">
+                    <summary>What do these options do?</summary>
+                    <div class="help-body">
+                        <dt>Offset / Length</dt>Restrict the scan to a region — skip boot sectors or target a known partition.
+                        <dt>Alignment</dt>Only accept headers at N-byte boundaries. Higher = faster, fewer false positives, may miss embedded files.
+                        <dt>Deep validate</dt>Full-decodes each carve (JPEG/PNG/ZIP/SQLite/gzip…) and tags it <code>verified</code> or <code>failed</code>.
+                        <dt>Dry run</dt>Emits the manifest (offsets, sizes, hashes) without recovering files — quick assessment.
+                    </div>
+                </details>
+            </div>
 
-                <div class="md-admonition md-admonition--warning" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">BitLocker Recovery Key</div>
-                    <p>48-digit Windows BitLocker recovery key (format: <code>XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX</code>). Unlocks BitLocker-encrypted volumes for carving/undelete.</p>
-                    <p><strong>Supported:</strong> AES-XTS-128/256 (Windows 10/11 default), AES-CBC-128/256 (older Windows), Elephant diffuser (Vista/7). Decryption is read-only and in-place — carved files are from decrypted NTFS.</p>
-                </div>
-
-                <div class="md-admonition md-admonition--info" style="margin-bottom: 1rem;">
-                    <div class="md-admonition__title">BitLocker Password</div>
-                    <p>User passphrase for BitLocker-protected volumes. Less common than recovery key for forensics, but supported for completeness.</p>
-                    <p><strong>Note:</strong> Passwords are case-sensitive. May fail if TPM-only protector is used (requires recovery key from AD/printed backup). Credentials are sent to the local server and passed to carvx via its environment — never on the command line.</p>
-                </div>
-
-                <div class="md-grid">
+            <!-- 5. BitLocker -->
+            <div class="card">
+                <h2 id="step5"><span class="step">5</span> BitLocker <span style="font-weight:400;font-size:.8rem;color:var(--fg-faint)">optional</span></h2>
+                <p class="field-desc">Unlock BitLocker-encrypted NTFS volumes. Credentials go to the local server and are passed to carvx via its environment — never on the command line.</p>
+                <div class="grid">
                     <div>
-                        <div class="md-form">
-                            <label for="bitlocker-key">Recovery Key (48 digits)</label>
-                            <input type="text" id="bitlocker-key" placeholder="471806-123456-...">
-                        </div>
+                        <label class="lbl" for="bitlocker-key">Recovery key (48 digits)</label>
+                        <input type="text" id="bitlocker-key" placeholder="471806-123456-…">
                     </div>
                     <div>
-                        <div class="md-form">
-                            <label for="bitlocker-pass">Password</label>
-                            <input type="password" id="bitlocker-pass">
-                        </div>
+                        <label class="lbl" for="bitlocker-pass">Password</label>
+                        <input type="password" id="bitlocker-pass">
                     </div>
                 </div>
+            </div>
 
-                <h2 id="step6">6. Run</h2>
-                <button class="md-button md-button--primary" id="run-btn" disabled>Run CarvX</button>
-                <button class="md-button md-button--secondary hidden" id="cancel-btn">Cancel</button>
-                <div id="progress-container" class="hidden" style="margin-top: 1rem;">
-                    <div class="md-progress">
-                        <div class="md-progress__fill" style="width: 0%"></div>
-                    </div>
-                    <p id="status-text" style="font-size: 0.85rem; color: var(--md-default-fg-color--light);"></p>
+            <!-- 6. Run -->
+            <div class="card">
+                <h2 id="step6"><span class="step">6</span> Run</h2>
+                <div class="runbar">
+                    <button class="btn btn--primary" id="run-btn" disabled>
+                        <span class="mdi mdi-play"></span> Run CarvX
+                    </button>
+                    <button class="btn btn--secondary hidden" id="cancel-btn">
+                        <span class="mdi mdi-stop"></span> Cancel
+                    </button>
+                    <span class="hint" id="run-hint">Add an input source first.</span>
                 </div>
 
-                <div id="results-container" class="hidden" style="margin-top: 1.5rem;">
-                    <div id="status-message" class="md-status"></div>
-                    <div id="output" class="md-output hidden"></div>
-                    <div id="results-actions" class="hidden" style="margin-top: 1rem;">
-                        <a id="view-results-btn" class="md-button md-button--primary" target="_blank">View Results</a>
-                        <a id="download-manifest-btn" class="md-button md-button--secondary">Download Manifest</a>
-                        <a id="download-all-btn" class="md-button md-button--secondary">Download All (ZIP)</a>
+                <div id="progress-container" class="hidden">
+                    <div class="progress"><div class="progress__fill"></div></div>
+                    <p id="status-text"></p>
+                </div>
+
+                <div id="results-container" class="hidden" style="margin-top:1.25rem">
+                    <div id="status-message" class="status"></div>
+                    <div id="results-actions" class="hidden runbar" style="margin-top:1rem">
+                        <a id="view-results-btn" class="btn btn--primary" target="_blank"><span class="mdi mdi-file-tree"></span> View results</a>
+                        <a id="download-manifest-btn" class="btn btn--secondary"><span class="mdi mdi-code-json"></span> Manifest</a>
+                        <a id="download-all-btn" class="btn btn--secondary"><span class="mdi mdi-folder-zip"></span> Download all (ZIP)</a>
                     </div>
+                    <div id="output" class="output hidden"></div>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        let currentJobId = '{{ job_id }}';
+        const currentJobId = '{{ job_id }}';
         let currentFilename = null;
         let pollInterval = null;
 
-        // Tab switching
-        document.querySelectorAll('.md-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.md-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.md-tab-content').forEach(c => c.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
-            });
+        /* ---- theme ---- */
+        const root = document.documentElement;
+        const themeBtn = document.getElementById('theme-toggle');
+        function applyTheme(t) {
+            root.setAttribute('data-md-color-scheme', t === 'dark' ? 'slate' : 'default');
+            themeBtn.querySelector('.mdi').className = 'mdi ' + (t === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night');
+        }
+        applyTheme(localStorage.getItem('carvx-theme')
+            || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+        themeBtn.addEventListener('click', () => {
+            const next = root.getAttribute('data-md-color-scheme') === 'slate' ? 'light' : 'dark';
+            localStorage.setItem('carvx-theme', next);
+            applyTheme(next);
         });
 
-        // Mode selection
-        const modeDescriptions = {
-            'carve': { id: 'mode-description', title: 'Signature Carve' },
-            'ntfs': { id: 'mode-ntfs', title: 'NTFS Undelete' },
-            'ext4': { id: 'mode-ext4', title: 'ext4 Undelete' },
-            'fat': { id: 'mode-fat', title: 'FAT Undelete' },
-            'hfs': { id: 'mode-hfs', title: 'HFS+ Undelete' },
-            'apfs': { id: 'mode-apfs', title: 'APFS Recovery' },
-            'auto': { id: 'mode-auto', title: 'Auto-Detect' }
-        };
-
-        document.querySelectorAll('.md-mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.md-mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                // Hide all descriptions
-                Object.values(modeDescriptions).forEach(desc => {
-                    const el = document.getElementById(desc.id);
-                    if (el) el.classList.add('hidden');
-                });
-                
-                // Show selected description
-                const selected = modeDescriptions[btn.dataset.mode];
-                const descEl = document.getElementById(selected.id);
-                if (descEl) {
-                    descEl.classList.remove('hidden');
-                    descEl.querySelector('.md-admonition__title').textContent = selected.title + ' (Selected)';
+        /* ---- scroll spy ---- */
+        const navLinks = [...document.querySelectorAll('.nav a')];
+        const spy = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    navLinks.forEach(l => l.classList.toggle('active',
+                        l.getAttribute('href') === '#' + e.target.id));
                 }
             });
-        });
+        }, { rootMargin: '-45% 0px -50% 0px' });
+        document.querySelectorAll('.card > h2[id]').forEach(h => spy.observe(h));
 
-        // Select all types
-        document.getElementById('select-all-types').addEventListener('change', (e) => {
-            document.querySelectorAll('input[name="type"]').forEach(cb => {
-                cb.checked = e.target.checked;
+        /* ---- tabs ---- */
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
             });
         });
 
-        // File upload
+        /* ---- mode descriptions ---- */
+        const MODES = {
+            carve: { title: 'Signature carve', body:
+                '<p><strong>What:</strong> scans raw bytes for file signatures with no filesystem metadata — works on raw images, corrupted or unknown filesystems, and unallocated space.</p>' +
+                '<p><strong>Recovers:</strong> contiguous files only, named by offset (e.g. <code>jpg/f_0x1a2b3c.jpg</code>). No original names, paths, or timestamps.</p>' +
+                '<p><strong>Best for:</strong> heavily damaged or formatted drives, unallocated space, unknown filesystem types.</p>' },
+            ntfs: { title: 'NTFS undelete', body:
+                '<p><strong>What:</strong> parses the MFT to recover deleted records and reads file extents from their actual clusters.</p>' +
+                '<p><strong>Recovers:</strong> original names, full paths, MACB timestamps, attributes, and fragmented files. Requires an intact MFT.</p>' +
+                '<p><strong>Best for:</strong> NTFS volumes with deleted files. Pair with BitLocker unlock if encrypted.</p>' },
+            ext4: { title: 'ext2/3/4 undelete', body:
+                '<p><strong>What:</strong> walks inodes and directory entries, recovering names from dirent slack.</p>' +
+                '<p><strong>Recovers:</strong> names (where slack survives), inode metadata, timestamps, and fragmented files via extent trees.</p>' +
+                '<p><strong>Best for:</strong> recent deletions; ext2/3 fare better than ext4 which zeros metadata aggressively.</p>' },
+            fat: { title: 'FAT12/16/32 + exFAT undelete', body:
+                '<p><strong>What:</strong> scans directory entries for deleted markers and rebuilds long filenames from VFAT/exFAT entries.</p>' +
+                '<p><strong>Recovers:</strong> names, timestamps, attributes, and the first contiguous run of clusters.</p>' +
+                '<p><strong>Best for:</strong> SD cards, USB drives, camera cards. Fragmented files truncate at first gap.</p>' },
+            hfs: { title: 'HFS+/HFSX undelete', body:
+                '<p><strong>What:</strong> walks the catalog B-tree for live and deleted records and parses fork extents.</p>' +
+                '<p><strong>Recovers:</strong> names, POSIX paths, timestamps, permissions, resource forks, and fragments.</p>' +
+                '<p><strong>Best for:</strong> macOS volumes where catalog records survive. Clean unmounts journal names away.</p>' },
+            apfs: { title: 'APFS recovery', body:
+                '<p><strong>What:</strong> scans copy-on-write structures — extents, directory records, snapshots — for superseded node copies.</p>' +
+                '<p><strong>Recovers:</strong> names, paths, precise timestamps, clones, snapshots, exact content (no fragmentation issues).</p>' +
+                '<p><strong>Best for:</strong> modern macOS (10.13+). Best-in-class recovery; FileVault requires an unlocked volume.</p>' },
+            auto: { title: 'Auto-detect + undelete', body:
+                '<p><strong>What:</strong> parses MBR/GPT/APM, detects each partition\'s filesystem, and dispatches the right undelete mode (carve fallback otherwise).</p>' +
+                '<p><strong>Recovers:</strong> everything the individual modes do, across all partitions in one run. Output lands in <code>part&lt;N&gt;_&lt;fs&gt;/</code>.</p>' +
+                '<p><strong>Best for:</strong> whole-disk images and unknown layouts — "recover everything" without picking a mode.</p>' },
+        };
+        const panel = document.getElementById('mode-panel');
+        function renderMode(mode) {
+            const m = MODES[mode];
+            panel.innerHTML = '<h3>' + m.title + '</h3>' + m.body;
+        }
+        renderMode('carve');
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderMode(btn.dataset.mode);
+            });
+        });
+
+        /* ---- types ---- */
+        const typeBoxes = () => [...document.querySelectorAll('input[name="type"]')];
+        const selAll = document.getElementById('select-all-types');
+        const countEl = document.getElementById('types-count');
+        function updateCount() {
+            const boxes = typeBoxes();
+            const n = boxes.filter(b => b.checked).length;
+            countEl.textContent = n + ' / ' + boxes.length + ' selected';
+            selAll.checked = n === boxes.length;
+            selAll.indeterminate = n > 0 && n < boxes.length;
+        }
+        selAll.addEventListener('change', e => {
+            typeBoxes().forEach(cb => { if (!cb.closest('[data-type-row]').classList.contains('hidden')) cb.checked = e.target.checked; });
+            updateCount();
+        });
+        document.getElementById('types-container').addEventListener('change', updateCount);
+        document.getElementById('types-filter').addEventListener('input', e => {
+            const q = e.target.value.toLowerCase();
+            document.querySelectorAll('[data-type-row]').forEach(row =>
+                row.classList.toggle('hidden', q && !row.dataset.name.includes(q)));
+        });
+        updateCount();
+
+        /* ---- upload ---- */
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('file-input');
-
+        const runHint = document.getElementById('run-hint');
         dropzone.addEventListener('click', () => fileInput.click());
-        
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.classList.add('dragover');
+        dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', e => {
+            e.preventDefault(); dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
         });
+        fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadFiles(fileInput.files); });
 
-        dropzone.addEventListener('dragleave', () => {
-            dropzone.classList.remove('dragover');
-        });
-
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length) uploadFiles(files);
-        });
-
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) uploadFiles(fileInput.files);
-        });
-
-        async function uploadFiles(files) {
-            const formData = new FormData();
-            for (const f of files) formData.append('file', f);
-            formData.append('job_id', currentJobId);
-
-            const fileInfo = document.getElementById('file-info');
-            fileInfo.innerHTML = 'Uploading...';
-            fileInfo.classList.remove('hidden');
-
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    currentFilename = data.filename;
-                    const extra = files.length > 1 ? ` +${files.length - 1} segment(s)` : '';
-                    fileInfo.innerHTML = `<strong>${data.filename}</strong>${extra} (${(data.size / 1024 / 1024).toFixed(2)} MB)`;
-                    fileInfo.className = 'md-status md-status--completed';
-                    document.getElementById('run-btn').disabled = false;
-                } else {
-                    fileInfo.innerHTML = `Error: ${data.error}`;
-                    fileInfo.className = 'md-status md-status--failed';
-                }
-            } catch (error) {
-                fileInfo.innerHTML = `Error: ${error.message}`;
-                fileInfo.className = 'md-status md-status--failed';
-            }
+        function sourceReady(name) {
+            currentFilename = name;
+            document.getElementById('run-btn').disabled = false;
+            runHint.textContent = 'Ready: ' + name;
         }
 
-        // Load path
-        document.getElementById('load-path-btn').addEventListener('click', async () => {
-            const filepath = document.getElementById('file-path').value;
-            if (!filepath) return;
-
-            const pathInfo = document.getElementById('path-info');
-            pathInfo.innerHTML = 'Loading...';
-            pathInfo.classList.remove('hidden');
-
+        async function uploadFiles(files) {
+            const fd = new FormData();
+            for (const f of files) fd.append('file', f);
+            fd.append('job_id', currentJobId);
+            const info = document.getElementById('file-info');
+            info.className = 'status status--running'; info.textContent = 'Uploading…';
+            info.classList.remove('hidden');
             try {
-                const response = await fetch('/upload/path', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: filepath, job_id: currentJobId })
+                const r = await fetch('/upload', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success) {
+                    const extra = files.length > 1 ? ` +${files.length - 1} segment(s)` : '';
+                    info.className = 'status status--completed';
+                    info.innerHTML = `<strong>${d.filename}</strong>${extra} — ${(d.size/1048576).toFixed(2)} MB`;
+                    sourceReady(d.filename);
+                } else { info.className = 'status status--failed'; info.textContent = 'Error: ' + d.error; }
+            } catch (err) { info.className = 'status status--failed'; info.textContent = 'Error: ' + err.message; }
+        }
+
+        document.getElementById('load-path-btn').addEventListener('click', async () => {
+            const path = document.getElementById('file-path').value;
+            if (!path) return;
+            const info = document.getElementById('path-info');
+            info.className = 'status status--running'; info.textContent = 'Loading…';
+            info.classList.remove('hidden');
+            try {
+                const r = await fetch('/upload/path', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, job_id: currentJobId })
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    currentFilename = data.filename;
-                    pathInfo.innerHTML = `<strong>${data.filename}</strong> (${(data.size / 1024 / 1024).toFixed(2)} MB)`;
-                    pathInfo.className = 'md-status md-status--completed';
-                    document.getElementById('run-btn').disabled = false;
-                } else {
-                    pathInfo.innerHTML = `Error: ${data.error}`;
-                    pathInfo.className = 'md-status md-status--failed';
-                }
-            } catch (error) {
-                pathInfo.innerHTML = `Error: ${error.message}`;
-                pathInfo.className = 'md-status md-status--failed';
-            }
+                const d = await r.json();
+                if (d.success) {
+                    info.className = 'status status--completed';
+                    info.innerHTML = `<strong>${d.filename}</strong> — ${(d.size/1048576).toFixed(2)} MB`;
+                    sourceReady(d.filename);
+                } else { info.className = 'status status--failed'; info.textContent = 'Error: ' + d.error; }
+            } catch (err) { info.className = 'status status--failed'; info.textContent = 'Error: ' + err.message; }
         });
 
-        // Run carvx
-        document.getElementById('run-btn').addEventListener('click', async () => {
-            const mode = document.querySelector('.md-mode-btn.active').dataset.mode;
-            const types = Array.from(document.querySelectorAll('input[name="type"]:checked')).map(cb => cb.value);
-            
+        /* ---- run ---- */
+        const runBtn = document.getElementById('run-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const fill = () => document.querySelector('.progress__fill');
+
+        runBtn.addEventListener('click', async () => {
             const data = {
                 job_id: currentJobId,
-                mode: mode,
-                types: types,
+                mode: document.querySelector('.mode-btn.active').dataset.mode,
+                types: typeBoxes().filter(cb => cb.checked).map(cb => cb.value),
                 offset: document.getElementById('offset').value,
                 length: document.getElementById('length').value,
                 align: document.getElementById('align').value,
@@ -1068,48 +649,37 @@
                 html: document.getElementById('html').checked,
                 timeline: document.getElementById('timeline').checked,
             };
+            const k = document.getElementById('bitlocker-key').value;
+            const p = document.getElementById('bitlocker-pass').value;
+            if (k) data.bitlocker_recovery_key = k;
+            if (p) data.bitlocker_password = p;
 
-            const bitlockerKey = document.getElementById('bitlocker-key').value;
-            const bitlockerPass = document.getElementById('bitlocker-pass').value;
-            if (bitlockerKey) data.bitlocker_recovery_key = bitlockerKey;
-            if (bitlockerPass) data.bitlocker_password = bitlockerPass;
-
-            const runBtn = document.getElementById('run-btn');
             runBtn.disabled = true;
-            runBtn.textContent = 'Running...';
-
-            const progressContainer = document.getElementById('progress-container');
-            progressContainer.classList.remove('hidden');
-            document.querySelector('.md-progress__fill').style.width = '0%';
+            runBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin"></span> Running…';
+            document.getElementById('progress-container').classList.remove('hidden');
+            fill().style.width = '0%';
             document.getElementById('results-container').classList.add('hidden');
 
             try {
-                const response = await fetch('/run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const r = await fetch('/run', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                const result = await response.json();
-                
-                if (result.success) {
-                    pollJobStatus(result.job_id);
-                } else {
-                    alert('Error: ' + result.error);
-                    runBtn.disabled = false;
-                    runBtn.textContent = 'Run CarvX';
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-                runBtn.disabled = false;
-                runBtn.textContent = 'Run CarvX';
-            }
+                const res = await r.json();
+                if (res.success) pollJobStatus(res.job_id);
+                else resetRun('Error: ' + res.error);
+            } catch (err) { resetRun('Error: ' + err.message); }
         });
 
-        const cancelBtn = document.getElementById('cancel-btn');
+        function resetRun(msg) {
+            runBtn.disabled = false;
+            runBtn.innerHTML = '<span class="mdi mdi-play"></span> Run CarvX';
+            if (msg) alert(msg);
+        }
+
         cancelBtn.addEventListener('click', async () => {
             cancelBtn.disabled = true;
-            try { await fetch(`/cancel/${currentJobId}`, { method: 'POST' }); }
-            catch (e) { console.error(e); }
+            try { await fetch(`/cancel/${currentJobId}`, { method: 'POST' }); } catch (e) { console.error(e); }
         });
 
         function fmtEta(s) {
@@ -1123,69 +693,53 @@
             cancelBtn.disabled = false;
             pollInterval = setInterval(async () => {
                 try {
-                    const response = await fetch(`/status/${jobId}`);
-                    const data = await response.json();
-
-                    const statusText = document.getElementById('status-text');
-                    const fill = document.querySelector('.md-progress__fill');
-                    const p = data.progress;
+                    const d = await (await fetch(`/status/${jobId}`)).json();
+                    const st = document.getElementById('status-text');
+                    const p = d.progress;
                     if (p && p.percent != null) {
-                        fill.style.width = `${p.percent}%`;
-                        statusText.textContent =
-                            `${p.percent.toFixed(1)}%  —  ` +
-                            `${(p.done / 1048576).toFixed(0)} / ${(p.total / 1048576).toFixed(0)} MiB` +
-                            (p.rate_mibs ? `  @ ${p.rate_mibs} MiB/s` : '') +
-                            `  —  ${data.carved || 0} carved  ${fmtEta(p.eta_s)}`;
+                        fill().style.width = p.percent + '%';
+                        st.textContent = `${p.percent.toFixed(1)}%  —  `
+                            + `${(p.done/1048576).toFixed(0)} / ${(p.total/1048576).toFixed(0)} MiB`
+                            + (p.rate_mibs ? `  @ ${p.rate_mibs} MiB/s` : '')
+                            + `  —  ${d.carved || 0} carved  ${fmtEta(p.eta_s)}`;
                     } else {
-                        statusText.textContent = `Status: ${data.status}` +
-                            (data.carved ? ` — ${data.carved} recovered` : '');
+                        st.textContent = `Status: ${d.status}` + (d.carved ? ` — ${d.carved} recovered` : '');
                     }
-
-                    if (['completed', 'failed', 'error', 'canceled', 'timeout'].includes(data.status)) {
+                    if (['completed','failed','error','canceled','timeout'].includes(d.status)) {
                         clearInterval(pollInterval);
                         cancelBtn.classList.add('hidden');
-                        showResults(data);
+                        showResults(d);
                     }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
+                } catch (err) { console.error('Polling error:', err); }
             }, 1000);
         }
 
-        function showResults(data) {
-            const resultsContainer = document.getElementById('results-container');
-            resultsContainer.classList.remove('hidden');
-            
-            const statusMessage = document.getElementById('status-message');
+        function showResults(d) {
+            document.getElementById('results-container').classList.remove('hidden');
+            const msg = document.getElementById('status-message');
+            const actions = document.getElementById('results-actions');
             const output = document.getElementById('output');
-            const resultsActions = document.getElementById('results-actions');
-            
-            if (data.status === 'completed') {
-                statusMessage.className = 'md-status md-status--completed';
-                statusMessage.innerHTML = `<strong>Completed:</strong> ${data.carved || 0} file(s) recovered.`;
-                resultsActions.classList.remove('hidden');
 
-                document.getElementById('view-results-btn').href = `/results/${data.job_id}`;
-                document.getElementById('download-manifest-btn').href = `/download-manifest/${data.job_id}`;
-                document.getElementById('download-all-btn').href = `/download-all/${data.job_id}`;
-            } else if (data.status === 'canceled') {
-                statusMessage.className = 'md-status md-status--running';
-                statusMessage.innerHTML = '<strong>Canceled.</strong> Partial results (if any) kept.';
-                resultsActions.classList.remove('hidden');
-                document.getElementById('view-results-btn').href = `/results/${data.job_id}`;
-                document.getElementById('download-manifest-btn').href = `/download-manifest/${data.job_id}`;
-                document.getElementById('download-all-btn').href = `/download-all/${data.job_id}`;
+            if (d.status === 'completed' || d.status === 'canceled') {
+                if (d.status === 'completed') {
+                    msg.className = 'status status--completed';
+                    msg.innerHTML = `<strong>Completed</strong> — ${d.carved || 0} file(s) recovered.`;
+                } else {
+                    msg.className = 'status status--running';
+                    msg.innerHTML = '<strong>Canceled.</strong> Partial results (if any) kept.';
+                }
+                actions.classList.remove('hidden');
+                document.getElementById('view-results-btn').href = `/results/${d.job_id}`;
+                document.getElementById('download-manifest-btn').href = `/download-manifest/${d.job_id}`;
+                document.getElementById('download-all-btn').href = `/download-all/${d.job_id}`;
             } else {
-                statusMessage.className = 'md-status md-status--failed';
-                statusMessage.innerHTML = `<strong>Failed:</strong> ${(data.error || 'Unknown error').split('\n').slice(-5).join('<br>')}`;
+                msg.className = 'status status--failed';
+                msg.innerHTML = `<strong>Failed:</strong> ${(d.error || 'Unknown error').split('\n').slice(-5).join('<br>')}`;
+                actions.classList.add('hidden');
             }
-            
-            const runBtn = document.getElementById('run-btn');
-            runBtn.disabled = false;
-            runBtn.textContent = 'Run CarvX';
-            
-            output.textContent = (data.output || '') + (data.error || '');
-            output.classList.remove('hidden');
+            resetRun();
+            output.textContent = (d.output || '') + (d.error || '');
+            output.classList.toggle('hidden', !output.textContent.trim());
         }
     </script>
 </body>
