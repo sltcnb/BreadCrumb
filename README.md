@@ -1,5 +1,10 @@
 <p align="center"><img src="docs/banner.svg" alt="carvX" width="100%"></p>
 
+
+## Demo
+
+<p align="center"><img src="docs/demo.gif" alt="carvX demo" width="100%"></p>
+
 # carvX
 
 Signature-based file carver for disk images and block devices, in the spirit of
