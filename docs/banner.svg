@@ -1,9 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="150" viewBox="0 0 1280 150" role="img" aria-label="carvX — Signature-based file carver for disk images &amp; devices">
-  <rect width="1280" height="150" fill="#ffffff"/>
-  <rect x="56" y="47" width="22" height="22" rx="5" fill="none" stroke="#f04e98" stroke-width="2.5"/><rect x="63" y="54" width="8" height="8" rx="2" fill="#f04e98"/>
-  <text x="96" y="66" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="30" font-weight="600" letter-spacing="-0.4" fill="#1c1e23">carvX</text>
-  <text x="96" y="97" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="400" fill="#515861">Signature-based file carver for disk images &amp; devices</text>
-  <text x="96" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="0.4" fill="#8a94a6">Python 3.10+   ·   stdlib only   ·   PhotoRec-style</text>
-  <rect x="0" y="0" width="4" height="150" fill="#f04e98"/>
-  <rect x="0.5" y="0.5" width="1279" height="149" fill="none" stroke="#e3e8ee" stroke-width="1"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="168" viewBox="0 0 1280 168" role="img" aria-label="carvX — Signature-based file carver for disk images &amp; devices">
+  <defs>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#be185d"/><stop offset="1" stop-color="#be185d" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#be185d"/><stop offset="1" stop-color="#be185d" stop-opacity="0.82"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="168" fill="#ffffff"/>
+  <circle cx="1210" cy="84" r="150" fill="#be185d" opacity="0.05"/>
+  <circle cx="1130" cy="208" r="120" fill="#be185d" opacity="0.045"/>
+  <rect x="52" y="58" width="52" height="52" rx="13" fill="url(#tile)"/>
+  <circle cx="75.0" cy="81.0" r="8" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M81.0 87.0 L89.0 95.0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="130" y="72" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="31" font-weight="650" letter-spacing="-0.5" fill="#101318">carvX</text>
+  <text x="130" y="100" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="15.5" fill="#4b5560">Signature-based file carver for disk images &amp; devices</text>
+  <text x="130" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12.5" fill="#94a0ad">Python 3.10+</text><circle cx="232" cy="119" r="1.6" fill="#be185d"/><text x="245" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12.5" fill="#94a0ad">stdlib only</text><circle cx="339" cy="119" r="1.6" fill="#be185d"/><text x="352" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12.5" fill="#94a0ad">PhotoRec-style</text>
+  <rect x="0" y="0" width="5" height="168" fill="url(#rail)"/>
+  <rect x="0.5" y="0.5" width="1279" height="167" rx="0" fill="none" stroke="#e6eaef" stroke-width="1"/>
 </svg>
