@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="150" viewBox="0 0 1280 150" role="img" aria-label="carvX — Signature-based file carver for disk images &amp; devices">
-  <rect width="1280" height="150" fill="#0b0e14"/>
+  <rect width="1280" height="150" fill="#ffffff"/>
   <rect x="56" y="47" width="22" height="22" rx="5" fill="none" stroke="#f04e98" stroke-width="2.5"/><rect x="63" y="54" width="8" height="8" rx="2" fill="#f04e98"/>
-  <text x="96" y="66" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="30" font-weight="600" letter-spacing="-0.4" fill="#f2f4f8">carvX</text>
-  <text x="96" y="97" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="400" fill="#8b95a5">Signature-based file carver for disk images &amp; devices</text>
-  <text x="96" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="0.4" fill="#5c6675">Python 3.10+   ·   stdlib only   ·   PhotoRec-style</text>
+  <text x="96" y="66" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="30" font-weight="600" letter-spacing="-0.4" fill="#1c1e23">carvX</text>
+  <text x="96" y="97" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="400" fill="#515861">Signature-based file carver for disk images &amp; devices</text>
+  <text x="96" y="123" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="0.4" fill="#8a94a6">Python 3.10+   ·   stdlib only   ·   PhotoRec-style</text>
   <rect x="0" y="0" width="4" height="150" fill="#f04e98"/>
+  <rect x="0.5" y="0.5" width="1279" height="149" fill="none" stroke="#e3e8ee" stroke-width="1"/>
 </svg>
