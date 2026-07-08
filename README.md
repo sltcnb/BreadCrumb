@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.svg" alt="carvX" width="100%"></p>
+<p align="center"><img src="docs/banner.png" alt="carvX" width="100%"></p>
 
 
 ## Demo
