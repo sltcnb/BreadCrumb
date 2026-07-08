@@ -1,10 +1,3 @@
-<p align="center"><img src="docs/banner.png" alt="carvX" width="100%"></p>
-
-
-## Demo
-
-<p align="center"><img src="docs/demo.gif" alt="carvX demo" width="100%"></p>
-
 # carvX
 
 Signature-based file carver for disk images and block devices, in the spirit of
@@ -13,6 +6,10 @@ filesystem metadata needed, so it works on formatted, corrupted, or unknown
 filesystems and on unallocated space.
 
 Pure Python 3.10+, stdlib only.
+
+## Demo
+
+<p align="center"><img src="docs/demo.gif" alt="carvX demo" width="100%"></p>
 
 ## Install
 
