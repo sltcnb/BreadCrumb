@@ -1,5 +1,10 @@
 # carvX
 
+[![CI](https://github.com/sltcnb/BreadCrumb/actions/workflows/ci.yml/badge.svg)](https://github.com/sltcnb/BreadCrumb/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Dependencies: stdlib only](https://img.shields.io/badge/deps-stdlib%20only-brightgreen)](pyproject.toml)
+
 Signature-based file carver for disk images and block devices, in the spirit of
 PhotoRec / Sleuth Kit. Recovers deleted files by scanning raw bytes — no
 filesystem metadata needed, so it works on formatted, corrupted, or unknown
@@ -266,3 +271,20 @@ hash-matches the original. Handler tests also feed truncated, corrupted, and
 pure-noise input to confirm no crashes and no false-positive validated carves.
 Disk-image readers are checked against `qemu-img`-produced QCOW2/VMDK. Tests
 that need an unavailable tool skip cleanly rather than fail.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup and the project's ground rules — most importantly the
+**stdlib-only** runtime constraint. Security issues should be reported
+privately per [SECURITY.md](SECURITY.md).
+
+## Disclaimer
+
+carvX is intended for legitimate data recovery and digital forensics. Only use
+it on media you own or are authorised to examine. Always work on a read-only
+copy of evidence, never the original.
+
+## License
+
+Released under the [MIT License](LICENSE).
