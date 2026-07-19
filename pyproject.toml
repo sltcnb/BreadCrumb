@@ -9,6 +9,27 @@ description = "Signature-based file carver for disk images and block devices (ph
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+license-files = ["LICENSE"]
+keywords = ["forensics", "file-carving", "data-recovery", "disk-image", "photorec", "undelete"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Recovery Tools",
+]
+
+[project.urls]
+Homepage = "https://github.com/sltcnb/BreadCrumb"
+Repository = "https://github.com/sltcnb/BreadCrumb"
+Issues = "https://github.com/sltcnb/BreadCrumb/issues"
 
 [project.optional-dependencies]
 # Optional accelerator. carvx decrypts BitLocker with zero deps (pure-Python
@@ -20,3 +41,11 @@ carvx = "carvx.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["carvx*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
