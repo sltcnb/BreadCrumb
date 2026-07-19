@@ -146,6 +146,18 @@ def test_random_noise_image_no_false_positives(tmp_path):
     assert [r for r in records if r.validated] == []
 
 
+def test_bmp_nonzero_reserved_fields_carved_end_to_end(tmp_path):
+    """A BMP with nonzero reserved1/reserved2 (as many editors write) must
+    survive both the scan precheck and the handler."""
+    data = bytearray(builders.make_bmp())
+    data[6:10] = b"\xff\xff\xab\xcd"
+    path = tmp_path / "img.bin"
+    path.write_bytes(b"\x00" * 512 + bytes(data) + os.urandom(512))
+    records = run_carver(str(path), tmp_path / "out")
+    bmps = [r for r in records if r.ext == "bmp"]
+    assert len(bmps) == 1 and bmps[0].size == len(data)
+
+
 def test_parallel_matches_serial(image, tmp_path):
     path, expected = image
     serial = run_carver(path, tmp_path / "s")

@@ -24,8 +24,10 @@ class Signature(NamedTuple):
 def _pre_bmp(buf, i):
     if i + 26 > len(buf):
         return True
-    return (buf[i + 6:i + 10] == b"\x00\x00\x00\x00"
-            and int.from_bytes(buf[i + 14:i + 18], "little") in (12, 40, 52, 56, 64, 108, 124))
+    # reserved1/reserved2 are commonly nonzero in real-world BMPs (many editors
+    # stamp them), so they aren't checked here; the DIB header size is still a
+    # cheap, reliable filter for noise.
+    return int.from_bytes(buf[i + 14:i + 18], "little") in (12, 40, 52, 56, 64, 108, 124)
 
 
 def _pre_mz(buf, i):

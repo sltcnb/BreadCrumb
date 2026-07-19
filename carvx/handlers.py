@@ -148,11 +148,13 @@ def carve_bmp(w: Window) -> Optional[Carve]:
     h = w.read(0, 26)
     if len(h) < 26:
         return None
+    if h[:2] != b"BM":
+        return None
     size = _u32le(h, 2)
     if not (26 <= size <= w.limit):
         return None
-    if h[6:10] != b"\x00\x00\x00\x00":          # reserved must be zero
-        return None
+    # reserved1/reserved2 (h[6:10]) are commonly nonzero in real-world BMPs
+    # (many editors stamp them), so they aren't a reliable rejection signal.
     if _u32le(h, 14) not in (12, 40, 52, 56, 64, 108, 124):  # DIB header size
         return None
     data_off = _u32le(h, 10)

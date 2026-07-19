@@ -144,6 +144,17 @@ def test_sqlite_rejects_bad_page_size():
     assert handlers.carve_sqlite(window(bytes(data))) is None
 
 
+def test_bmp_with_nonzero_reserved_fields_is_carved():
+    """Real-world editors often stamp reserved1/reserved2; they must not
+    cause a false-negative rejection."""
+    data = bytearray(builders.make_bmp())
+    data[6:10] = b"\xff\xff\xab\xcd"           # reserved1/reserved2 nonzero
+    carve = handlers.carve_bmp(window(bytes(data) + os.urandom(2000)))
+    assert carve is not None
+    assert carve.size == len(data)
+    assert carve.ext == "bmp"
+
+
 def test_empty_and_tiny_windows():
     for sig in BY_NAME.values():
         assert sig.handler(window(b"")) is None
