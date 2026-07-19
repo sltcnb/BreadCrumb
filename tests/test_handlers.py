@@ -161,10 +161,22 @@ def test_empty_and_tiny_windows():
         assert sig.handler(window(b"\x00")) is None
 
 
+# Leading bytes carve_macho recognizes: the fat/universal magic plus the four
+# thin Mach-O magics. A host binary that does not start with one of these (an
+# ELF /bin/ls on Linux, say) is not a Mach-O and must not be fed to this test.
+_MACHO_MAGICS = (
+    b"\xca\xfe\xba\xbe",  # fat / universal
+    b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",  # thin, little-endian (64/32)
+    b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",  # thin, big-endian (64/32)
+)
+
+
 def test_macho_fat_binary():
     if not os.path.exists("/bin/ls"):
         pytest.skip("no /bin/ls")
     data = open("/bin/ls", "rb").read()
+    if data[:4] not in _MACHO_MAGICS:
+        pytest.skip("host /bin/ls is not a Mach-O binary (e.g. ELF on Linux)")
     carve = handlers.carve_macho(window(data + os.urandom(1000)))
     assert carve is not None and carve.size == len(data)
 
