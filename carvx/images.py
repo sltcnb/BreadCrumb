@@ -390,7 +390,13 @@ class EwfReader:
         self.bytes_per_sector = 512
         self.size = 0
         self._chunks = []          # (segment_idx, file_offset, compressed)
-        self._parse()
+        try:
+            self._parse()
+        except BaseException:
+            # Parsing may raise after fds were opened; don't leak them since a
+            # failed constructor never gives the caller a handle to close().
+            self.close()
+            raise
 
     @staticmethod
     def _glob(path):
@@ -522,14 +528,22 @@ class StdinReader(Reader):
         stream = stream if stream is not None else sys.stdin.buffer
         fd, self._tmp = tempfile.mkstemp(prefix="carvx_stdin_", dir=spool_dir)
         try:
-            while True:
-                chunk = stream.read(8 << 20)
-                if not chunk:
-                    break
-                os.write(fd, chunk)
-        finally:
-            os.close(fd)
-        super().__init__(self._tmp)
+            try:
+                while True:
+                    chunk = stream.read(8 << 20)
+                    if not chunk:
+                        break
+                    os.write(fd, chunk)
+            finally:
+                os.close(fd)
+            super().__init__(self._tmp)
+        except BaseException:
+            # Spooling or sizing failed (e.g. empty stdin): don't leak the temp.
+            try:
+                os.unlink(self._tmp)
+            except OSError:
+                pass
+            raise
         self.path = "-"
 
     def close(self):

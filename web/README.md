@@ -15,10 +15,12 @@ venv/bin/python -m carvx_web
 ```
 
 Binds to `127.0.0.1` by default. To expose on the network (only on a
-trusted LAN — there is no authentication):
+trusted LAN — there is no authentication, and `POST /upload/path` will
+read any file path reachable by the server process), you must opt in
+with `CARVX_WEB_ALLOW_REMOTE=1`; otherwise the app refuses to start:
 
 ```bash
-CARVX_WEB_HOST=0.0.0.0 PORT=8080 venv/bin/python -m carvx_web
+CARVX_WEB_HOST=0.0.0.0 PORT=8080 CARVX_WEB_ALLOW_REMOTE=1 venv/bin/python -m carvx_web
 ```
 
 Behind a real WSGI server:
