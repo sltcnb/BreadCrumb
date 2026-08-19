@@ -363,7 +363,7 @@ def _locate_volume(reader: Reader, offset: int):
 # ----------------------------------------------------------------------
 
 def run_ntfs(args) -> int:
-    """CLI entry for --ntfs mode (args from carvx.cli parser)."""
+    """CLI entry for --ntfs mode (args from breadcrumb.cli parser)."""
     from .carver import emit
     from .cli import parse_size, write_outputs
     import datetime

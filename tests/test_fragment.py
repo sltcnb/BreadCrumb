@@ -11,10 +11,10 @@ import struct
 import zlib
 
 
-from carvx.carver import Carver, Options
-from carvx.fragment import bifragment_carve
-from carvx.reader import Reader, Window
-from carvx.signatures import BY_NAME
+from breadcrumb.carver import Carver, Options
+from breadcrumb.fragment import bifragment_carve
+from breadcrumb.reader import Reader, Window
+from breadcrumb.signatures import BY_NAME
 
 
 def big_png(seed=0):

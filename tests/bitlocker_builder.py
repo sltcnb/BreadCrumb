@@ -1,7 +1,7 @@
 """Build a synthetic BitLocker (FVE) disk image for tests.
 
 Produces a byte image whose layout mirrors a real BitLocker volume closely
-enough to exercise carvx.bitlocker's real parse + key-recovery + decrypt path:
+enough to exercise breadcrumb.bitlocker's real parse + key-recovery + decrypt path:
 an FVE boot sector with metadata offsets, an FVE metadata block carrying a
 recovery-password VMK protector and a VMK-wrapped FVEK, encrypted data sectors,
 and a relocated backup of the original boot sector.
@@ -9,7 +9,7 @@ and a relocated backup of the original boot sector.
 
 import struct
 
-from carvx import _aes, bitlocker
+from breadcrumb import _aes, bitlocker
 
 SS = 512
 

@@ -58,7 +58,7 @@ def make_pdf() -> bytes:
 def make_zip() -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("hello.txt", "hello carvx " * 50)
+        z.writestr("hello.txt", "hello breadcrumb " * 50)
         z.writestr("dir/data.bin", os.urandom(1000))
     return buf.getvalue()
 
@@ -72,7 +72,7 @@ def make_docx_like() -> bytes:
 
 
 def make_gzip() -> bytes:
-    return gzip.compress(b"carvx gzip payload " * 200)
+    return gzip.compress(b"breadcrumb gzip payload " * 200)
 
 
 def make_sqlite() -> bytes:
@@ -218,7 +218,7 @@ def make_hive() -> bytes:
 def make_bplist() -> bytes:
     """Real binary plist via plistlib so the trailer math is correct."""
     import plistlib
-    return plistlib.dumps({"a": 1, "b": [1, 2, 3], "c": "carvx"},
+    return plistlib.dumps({"a": 1, "b": [1, 2, 3], "c": "breadcrumb"},
                           fmt=plistlib.FMT_BINARY)
 
 

@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from carvx import customsig, grep, report
-from carvx.carver import Carver, Options
-from carvx.reader import Reader
+from breadcrumb import customsig, grep, report
+from breadcrumb.carver import Carver, Options
+from breadcrumb.reader import Reader
 
 
 # ---------------------------------------------------------------- grep
@@ -78,7 +78,7 @@ def test_customsig_multi_magic_and_no_footer(tmp_path):
     sigs = customsig.load(str(cfg))
     assert sigs[0].magics == (b"\xaa\xbb", b"\xcc\xdd")
     # no footer -> best-effort carve to window cap (unvalidated)
-    from carvx.reader import Window
+    from breadcrumb.reader import Window
 
     class BR:
         def __init__(self, d): self.data, self.size = d, len(d)
@@ -99,7 +99,7 @@ def test_customsig_invalid_raises(tmp_path):
 
 def _manifest_with_times():
     return {
-        "tool": "carvx test", "source": "/dev/null", "source_size": 1000,
+        "tool": "breadcrumb test", "source": "/dev/null", "source_size": 1000,
         "files": [
             {"ext": "txt", "offset": 5, "size": 100, "sha256": "a" * 64,
              "validated": True, "name": "a.txt", "deleted": True,
@@ -139,6 +139,6 @@ def test_html_report(tmp_path):
     out = tmp_path / "r.html"
     report.write_html_report(m, str(out))
     doc = out.read_text()
-    assert "carvX recovery report" in doc
+    assert "BreadCrumb recovery report" in doc
     assert "a.txt" in doc and "pic.jpg" in doc
     assert "<table" in doc

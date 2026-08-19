@@ -1,4 +1,4 @@
-# carvX
+# BreadCrumb
 
 [![CI](https://github.com/sltcnb/BreadCrumb/actions/workflows/ci.yml/badge.svg)](https://github.com/sltcnb/BreadCrumb/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -14,14 +14,14 @@ Pure Python 3.10+, stdlib only.
 
 ## Demo
 
-<p align="center"><img src="docs/demo.gif" alt="carvX demo" width="100%"></p>
+<p align="center"><img src="docs/demo.gif" alt="BreadCrumb demo" width="100%"></p>
 
 ## Install
 
 ```sh
 pip install -e .
 # or run without installing:
-python3 -m carvx --help
+python3 -m breadcrumb --help
 ```
 
 Pure Python 3.10+ / stdlib only. Optional extras improve specific features:
@@ -33,51 +33,51 @@ Disk-image formats (raw, split, EWF/E01, QCOW2, VMDK) are auto-detected.
 
 ```sh
 # carve a disk image
-carvx image.dd -o recovered/
+bcrumb image.dd -o recovered/
 
 # carve a whole disk (raw devices need root; on macOS prefer /dev/diskN
 # over /dev/rdiskN — rdisk requires block-aligned reads)
-sudo carvx /dev/disk4 -o recovered/          # macOS
-sudo carvx /dev/sdb -o recovered/            # Linux
-carvx \\.\PhysicalDrive1 -o recovered\       # Windows (admin shell)
-carvx \\.\D: -o recovered\                   # Windows, single volume
+sudo bcrumb /dev/disk4 -o recovered/          # macOS
+sudo bcrumb /dev/sdb -o recovered/            # Linux
+bcrumb \\.\PhysicalDrive1 -o recovered\       # Windows (admin shell)
+bcrumb \\.\D: -o recovered\                   # Windows, single volume
 
 # only some types
-carvx image.dd -t jpg,png,pdf,sqlite -o out/
+bcrumb image.dd -t jpg,png,pdf,sqlite -o out/
 
 # scan a region (e.g. one partition: offset + length)
-carvx /dev/disk4 --offset 209735680 --length 64G -o out/
+bcrumb /dev/disk4 --offset 209735680 --length 64G -o out/
 
 # faster scan of a filesystem with known cluster alignment
-carvx image.dd --align 4096 -o out/
+bcrumb image.dd --align 4096 -o out/
 
 # inventory only, write nothing
-carvx image.dd --dry-run
+bcrumb image.dd --dry-run
 
 # go faster: 8 parallel scan processes (0 = all cores)
-carvx image.dd -j 8 -o out/
+bcrumb image.dd -j 8 -o out/
 
 # also emit CSV + Sleuth Kit bodyfile; hash the whole source for custody
-carvx image.dd -o out/ --csv out/files.csv --bodyfile out/bodyfile --hash-source
+bcrumb image.dd -o out/ --csv out/files.csv --bodyfile out/bodyfile --hash-source
 
 # JSON-lines events on stdout (for wrapping in a GUI/pipeline)
-carvx image.dd --machine -o out/
+bcrumb image.dd --machine -o out/
 
 # deep-validate carves (decode JPEG/PNG/ZIP/gzip/SQLite), drop ones that fail
-carvx image.dd --validate -o out/
-carvx image.dd --drop-failed -o out/
+bcrumb image.dd --validate -o out/
+bcrumb image.dd --drop-failed -o out/
 
 # filesystem-metadata undelete (recovers names, paths, timestamps):
-carvx image.dd --ntfs  -o out/    # NTFS  (Windows)
-carvx image.dd --ext4  -o out/    # ext2/3/4 (Linux)
-carvx image.dd --fat   -o out/    # FAT12/16/32 + exFAT (SD/USB/cameras)
+bcrumb image.dd --ntfs  -o out/    # NTFS  (Windows)
+bcrumb image.dd --ext4  -o out/    # ext2/3/4 (Linux)
+bcrumb image.dd --fat   -o out/    # FAT12/16/32 + exFAT (SD/USB/cameras)
 
 # whole disk: list partitions, then auto-detect FS + undelete each
-carvx disk.dd --list-partitions
-carvx disk.dd --auto -o out/
+bcrumb disk.dd --list-partitions
+bcrumb disk.dd --auto -o out/
 
 # list supported types
-carvx --list-types
+bcrumb --list-types
 ```
 
 ## Modes
@@ -210,33 +210,33 @@ Inherent carving limits (same for PhotoRec):
 
 ## BitLocker (Windows FVE)
 
-carvx decrypts BitLocker volumes **in place**: supply a credential and the
+BreadCrumb decrypts BitLocker volumes **in place**: supply a credential and the
 locked volume reads back as plaintext NTFS at the same offset, so carving,
 the `--ntfs`/`--auto` undelete modes, `--grep`, and `--list-partitions` all
 work as if the disk were never encrypted.
 
 ```bash
 # carve a recovery-key-protected SSD image (XTS-AES, the Win10/11 default)
-carvx disk.E01 --bitlocker-recovery-key 471806-...-635835 -o out
+bcrumb disk.E01 --bitlocker-recovery-key 471806-...-635835 -o out
 
 # whole-disk auto mode: detect the BitLocker partition, unlock, undelete NTFS
-carvx /dev/sdb --auto --bitlocker-recovery-key 471806-...-635835
+bcrumb /dev/sdb --auto --bitlocker-recovery-key 471806-...-635835
 
 # other protectors
-carvx disk.dd --bitlocker-password 'Hunter2!'        # user passphrase
-carvx disk.dd --bitlocker-bek startup.BEK            # startup key file
-carvx disk.dd --bitlocker-fvek 0011aabb...           # raw FVEK (hex)
+bcrumb disk.dd --bitlocker-password 'Hunter2!'        # user passphrase
+bcrumb disk.dd --bitlocker-bek startup.BEK            # startup key file
+bcrumb disk.dd --bitlocker-fvek 0011aabb...           # raw FVEK (hex)
 ```
 
 Supported ciphers: AES-XTS-128/256 (Windows 8+/10/11, incl. SSDs),
 AES-CBC-128/256, and AES-CBC + Elephant diffuser (Vista/7). Suspended volumes
 (clear-key protector) unlock with no credential. Decryption is pure-Python and
 read-only; installing the optional `cryptography` package (`pip install
-carvx[bitlocker]`) swaps in C-backed AES for a large speedup.
+breadcrumb[bitlocker]`) swaps in C-backed AES for a large speedup.
 
 ## Notes
 
-- By default carvx skips over validated carves (PhotoRec behavior). Use
+- By default BreadCrumb skips over validated carves (PhotoRec behavior). Use
   `--no-skip` to also find files embedded inside other files.
 - Unvalidated carves (rar, legacy sqlite, gz at window edge) may have junk
   appended at the tail — the real data is at the front.
@@ -281,7 +281,7 @@ privately per [SECURITY.md](SECURITY.md).
 
 ## Disclaimer
 
-carvX is intended for legitimate data recovery and digital forensics. Only use
+BreadCrumb is intended for legitimate data recovery and digital forensics. Only use
 it on media you own or are authorised to examine. Always work on a read-only
 copy of evidence, never the original.
 

@@ -1,4 +1,4 @@
-"""carvx command-line interface."""
+"""BreadCrumb command-line interface."""
 
 import argparse
 import csv
@@ -29,7 +29,7 @@ def parse_size(text: str) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="carvx",
+        prog="bcrumb",
         description="Signature-based file carver for disk images and block devices "
                     "(photorec-style). Recovers deleted files by scanning raw bytes; "
                     "no filesystem needed.")
@@ -143,7 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="JSON-lines events on stdout (progress/carve/summary); "
                         "implies no human progress output")
     p.add_argument("-q", "--quiet", action="store_true", help="no progress output")
-    p.add_argument("--version", action="version", version=f"carvx {__version__}")
+    p.add_argument("--version", action="version", version=f"BreadCrumb {__version__}")
     return p
 
 
@@ -169,7 +169,7 @@ def write_outputs(args, opts, records, source_size, scan_meta):
         d["confidence"] = r.confidence
         rows.append(d)
     manifest = {
-        "tool": f"carvx {__version__}",
+        "tool": f"BreadCrumb {__version__}",
         "source": os.path.abspath(args.source),
         "source_size": source_size,
         **scan_meta,
@@ -221,7 +221,7 @@ def run_auto(args) -> int:
 
     targets = whole or [(p.start, p.fstype) for p in parts]
     if not args.quiet:
-        print(f"carvx auto: {len(targets)} target(s) on {args.source}",
+        print(f"BreadCrumb auto: {len(targets)} target(s) on {args.source}",
               file=sys.stderr)
 
     base_out = args.output
@@ -259,7 +259,7 @@ def run_auto(args) -> int:
 
 
 def _setup_bitlocker(args) -> int:
-    """Build BitLocker credentials from CLI flags into CARVX_BITLOCKER env so
+    """Build BitLocker credentials from CLI flags into BREADCRUMB_BITLOCKER env so
     every open_source() (incl. spawned workers) unlocks transparently."""
     if not (args.bitlocker_recovery_key or args.bitlocker_password
             or args.bitlocker_bek or args.bitlocker_fvek):
@@ -288,7 +288,7 @@ def _setup_bitlocker(args) -> int:
             return 2
     creds = Credentials(recovery=args.bitlocker_recovery_key,
                         password=args.bitlocker_password, bek=bek, fvek=fvek)
-    os.environ["CARVX_BITLOCKER"] = creds.to_env()
+    os.environ["BREADCRUMB_BITLOCKER"] = creds.to_env()
     return 0
 
 
@@ -320,7 +320,7 @@ def main(argv=None) -> int:
     spool = None
     if args.source in ("-", "/dev/stdin"):
         import tempfile
-        fd, spool = tempfile.mkstemp(prefix="carvx_stdin_")
+        fd, spool = tempfile.mkstemp(prefix="breadcrumb_stdin_")
         if not args.quiet:
             print("reading from stdin (spooling to temp file)...", file=sys.stderr)
         with os.fdopen(fd, "wb") as out:
@@ -458,7 +458,7 @@ def main_carve(args) -> int:
     source_size = carver.reader.size
     if not opts.quiet:
         kind = "device" if carver.reader.is_device else "image"
-        print(f"carvx {__version__}: scanning {kind} {args.source} "
+        print(f"BreadCrumb {__version__}: scanning {kind} {args.source} "
               f"({source_size / (1 << 20):,.0f} MiB), "
               f"{len(sigs)} signatures, {jobs} process(es)", file=sys.stderr)
 

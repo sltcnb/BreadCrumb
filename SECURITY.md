@@ -2,7 +2,7 @@
 
 ## Scope
 
-carvX is a forensic file carver that parses **untrusted, potentially
+BreadCrumb is a forensic file carver that parses **untrusted, potentially
 adversarial input**: disk images, block devices, and filesystem metadata that
 may be corrupted or deliberately malformed. The most relevant security concerns
 for this project are therefore:
@@ -12,7 +12,7 @@ for this project are therefore:
   reconstructing recovered filenames.
 - Handling of decryption credentials (BitLocker keys/passwords).
 
-carvX is **read-only** with respect to the source it analyses and never
+BreadCrumb is **read-only** with respect to the source it analyses and never
 modifies the evidence image or device.
 
 ## Handling credentials
@@ -20,7 +20,7 @@ modifies the evidence image or device.
 BitLocker credentials passed on the command line (`--bitlocker-password`,
 `--bitlocker-recovery-key`, `--bitlocker-fvek`) may be visible in your shell
 history and process list. Prefer key files (`--bitlocker-bek`) or run in an
-environment where the process list is not exposed. carvX passes credentials to
+environment where the process list is not exposed. BreadCrumb passes credentials to
 worker processes through an environment variable that is not written to disk.
 
 ## Reporting a vulnerability

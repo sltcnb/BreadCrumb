@@ -10,8 +10,8 @@ import os
 
 import pytest
 
-from carvx import _aes, bitlocker
-from carvx.images import open_source, BitLockerDecryptingReader
+from breadcrumb import _aes, bitlocker
+from breadcrumb.images import open_source, BitLockerDecryptingReader
 from tests.bitlocker_builder import build_image, SS
 
 # each group must be divisible by 11 and < 65536*11; build valid ones.
@@ -75,7 +75,7 @@ def test_unlock_each_method(method, tmp_path):
     path = tmp_path / "disk.dd"
     path.write_bytes(img)
 
-    from carvx.reader import Reader
+    from breadcrumb.reader import Reader
     r = Reader(str(path))
     creds = bitlocker.Credentials(recovery=RECOVERY)
     vol = bitlocker.unlock_volume(r, 0, creds)
@@ -91,7 +91,7 @@ def test_wrong_recovery_key_fails(tmp_path):
     img = build_image(pt, RECOVERY)
     path = tmp_path / "disk.dd"
     path.write_bytes(img)
-    from carvx.reader import Reader
+    from breadcrumb.reader import Reader
     r = Reader(str(path))
     wrong = "-".join(f"{9000 * 11:06d}" for _ in range(8))   # valid format, wrong key
     with pytest.raises(bitlocker.BitLockerError):
@@ -108,7 +108,7 @@ def test_fvek_direct(tmp_path):
     # pull the FVEK out via the recovery path, then re-unlock using only --fvek
     path = tmp_path / "disk.dd"
     path.write_bytes(img)
-    from carvx.reader import Reader
+    from breadcrumb.reader import Reader
     r = Reader(str(path))
     meta = None
     boot = r.pread(0, 512)
@@ -132,7 +132,7 @@ def test_open_source_transparent_decrypt(tmp_path, monkeypatch):
     path.write_bytes(img)
 
     creds = bitlocker.Credentials(recovery=RECOVERY)
-    monkeypatch.setenv("CARVX_BITLOCKER", creds.to_env())
+    monkeypatch.setenv("BREADCRUMB_BITLOCKER", creds.to_env())
     r = open_source(str(path))
     assert isinstance(r, BitLockerDecryptingReader)
     # reads at absolute offset 0 now yield decrypted NTFS boot in place
@@ -146,7 +146,7 @@ def test_open_source_no_creds_passthrough(tmp_path):
     img = build_image(pt, RECOVERY)
     path = tmp_path / "disk.dd"
     path.write_bytes(img)
-    os.environ.pop("CARVX_BITLOCKER", None)
+    os.environ.pop("BREADCRUMB_BITLOCKER", None)
     r = open_source(str(path))
     assert not isinstance(r, BitLockerDecryptingReader)
     assert r.pread(3, 8) == bitlocker.FVE_SIGNATURE       # still encrypted
@@ -154,7 +154,7 @@ def test_open_source_no_creds_passthrough(tmp_path):
 
 
 def test_cli_carve_through_bitlocker(tmp_path):
-    from carvx.cli import main
+    from breadcrumb.cli import main
     from tests.builders import make_jpeg
     jpeg = make_jpeg()
     vol = bytearray(_plaintext_volume(2) + bytes(SS * 8))
@@ -170,17 +170,17 @@ def test_cli_carve_through_bitlocker(tmp_path):
     carved = list(out.rglob("*.jpg"))
     assert carved, "no JPEG carved from the decrypted volume"
     assert carved[0].read_bytes().startswith(b"\xff\xd8")
-    os.environ.pop("CARVX_BITLOCKER", None)
+    os.environ.pop("BREADCRUMB_BITLOCKER", None)
 
 
 def test_credentials_env_roundtrip():
     c = bitlocker.Credentials(recovery="r", password="p",
                               bek=b"\x01\x02", fvek=b"\xaa\xbb")
     env = c.to_env()
-    os.environ["CARVX_BITLOCKER"] = env
+    os.environ["BREADCRUMB_BITLOCKER"] = env
     try:
         got = bitlocker.Credentials.from_env()
         assert got.recovery == "r" and got.password == "p"
         assert got.bek == b"\x01\x02" and got.fvek == b"\xaa\xbb"
     finally:
-        os.environ.pop("CARVX_BITLOCKER", None)
+        os.environ.pop("BREADCRUMB_BITLOCKER", None)

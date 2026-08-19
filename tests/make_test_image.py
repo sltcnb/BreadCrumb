@@ -1,5 +1,5 @@
 """Build a synthetic disk image with known files at known offsets,
-run carvx over it, and verify recovered files hash-match the originals.
+run breadcrumb over it, and verify recovered files hash-match the originals.
 
 Usage: python3 tests/make_test_image.py
 """
@@ -72,7 +72,7 @@ def make_pdf() -> bytes:
 def make_zip() -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("hello.txt", "hello carvx " * 50)
+        z.writestr("hello.txt", "hello breadcrumb " * 50)
         z.writestr("dir/data.bin", os.urandom(1000))
     return buf.getvalue()
 
@@ -86,7 +86,7 @@ def make_docx_like() -> bytes:
 
 
 def make_gzip() -> bytes:
-    return gzip.compress(b"carvx gzip payload " * 200)
+    return gzip.compress(b"breadcrumb gzip payload " * 200)
 
 
 def make_sqlite() -> bytes:
@@ -154,8 +154,8 @@ def main():
         "elf": make_elf(),
     }
 
-    image_path = os.path.join(tempfile.gettempdir(), "carvx_test.img")
-    out_dir = os.path.join(tempfile.gettempdir(), "carvx_test_out")
+    image_path = os.path.join(tempfile.gettempdir(), "breadcrumb_test.img")
+    out_dir = os.path.join(tempfile.gettempdir(), "breadcrumb_test_out")
     subprocess.run(["rm", "-rf", out_dir], check=True)
 
     expected = {}
@@ -172,10 +172,10 @@ def main():
         img.write(b"\x00" * 4096)
 
     print(f"image: {image_path} ({os.path.getsize(image_path):,} B)")
-    r = subprocess.run([sys.executable, "-m", "carvx", image_path, "-o", out_dir, "-q"],
+    r = subprocess.run([sys.executable, "-m", "breadcrumb", image_path, "-o", out_dir, "-q"],
                        cwd=ROOT)
     if r.returncode != 0:
-        print("FAIL: carvx exited", r.returncode)
+        print("FAIL: breadcrumb exited", r.returncode)
         return 1
 
     with open(os.path.join(out_dir, "manifest.json")) as fh:
