@@ -169,7 +169,7 @@ each to its own `part<N>_<fs>/` subdirectory.
 | sqlite | SQLite 3                       | page_size × page_count                      |
 | mp4    | MP4 / MOV                      | top-level box walk                          |
 | riff   | WAV, AVI, WebP                 | RIFF size field                             |
-| mp3    | MP3 (ID3v2-tagged)             | ID3 size + MPEG frame walk                  |
+| mp3    | MP3 (ID3v2-tagged)             | ID3 size + profile-locked MPEG frame walk   |
 | exe    | PE (exe/dll)                   | section table + Authenticode cert           |
 | elf    | ELF                            | section header table end                    |
 | macho  | Mach-O thin + universal        | load command / fat arch extents             |

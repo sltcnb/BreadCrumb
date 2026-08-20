@@ -161,6 +161,56 @@ def test_bmp_with_nonzero_reserved_fields_is_carved():
     assert carve.ext == "bmp"
 
 
+# MPEG audio frame headers, as (byte 1, bitrate index, frame length). Byte 1
+# carries the sync bits plus version and layer; the length follows from the
+# bitrate and sample rate, so it is spelled out here rather than derived from
+# the handler under test.
+_MPEG1_L3 = 0xFB                               # MPEG1 Layer III, 44100 Hz
+_MPEG2_L3 = 0xF3                               # MPEG2 Layer III, 22050 Hz
+
+
+def mpeg_frame(byte1: int, br_idx: int, length: int) -> bytes:
+    """One frame: 4-byte header (no padding, no CRC) plus silent payload."""
+    return bytes([0xFF, byte1, br_idx << 4, 0x00]) + b"\x00" * (length - 4)
+
+
+def id3v2(body: bytes = b"") -> bytes:
+    n = len(body)                              # synchsafe 4x7-bit size
+    return b"ID3\x03\x00\x00" + bytes([(n >> 21) & 0x7F, (n >> 14) & 0x7F,
+                                        (n >> 7) & 0x7F, n & 0x7F]) + body
+
+
+def test_mp3_vbr_bitrate_changes_stay_one_stream():
+    """Bitrate may change frame to frame; version/layer/rate may not."""
+    data = id3v2() + (mpeg_frame(_MPEG1_L3, 9, 417)      # 144 * 128000 // 44100
+                      + mpeg_frame(_MPEG1_L3, 11, 626)   # 144 * 192000 // 44100
+                      + mpeg_frame(_MPEG1_L3, 9, 417)) * 4
+    carve = handlers.carve_mp3(window(data + junk(2000)))
+    assert carve is not None and carve.size == len(data)
+
+
+def test_mp3_stops_at_frame_shaped_trailing_data():
+    """Trailing data can sync and decode as a valid header by chance. If it
+    declares a different version/layer/rate than the stream, it is not a
+    frame of this file and must not extend the carve."""
+    data = builders.make_mp3()                 # MPEG1 Layer III, 44100 Hz
+    other = mpeg_frame(_MPEG2_L3, 8, 208) * 4  # 72 * 64000 // 22050
+    assert handlers._mp3_frame(other[:4]) is not None, "junk header not valid"
+    carve = handlers.carve_mp3(window(data + other))
+    assert carve is not None and carve.size == len(data)
+
+
+def test_mp3_absorbs_trailing_id3v1_only_when_it_fits():
+    data = builders.make_mp3()
+    whole = data + b"TAG" + b"\x00" * 125      # ID3v1 is exactly 128 bytes
+    carve = handlers.carve_mp3(window(whole + junk(500)))
+    assert carve is not None and carve.size == len(whole)
+
+    cut = data + b"TAG" + b"\x00" * 60         # truncated: leave it out
+    carve = handlers.carve_mp3(window(cut))
+    assert carve is not None and carve.size == len(data)
+
+
 def test_empty_and_tiny_windows():
     for sig in BY_NAME.values():
         assert sig.handler(window(b"")) is None
