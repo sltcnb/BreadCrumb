@@ -1,18 +1,18 @@
-"""build_command() assembles the argv handed to `python -m carvx`; every
+"""build_command() assembles the argv handed to `python -m breadcrumb`; every
 option must land in the right argv slot (or be omitted) since this is the
 only thing standing between the web form and a subprocess invocation."""
 
 from pathlib import Path
 
-from carvx_web import config
-from carvx_web.runner import build_command
+from breadcrumb_web import config
+from breadcrumb_web.runner import build_command
 
 SOURCE = "/evidence/image.dd"
 OUT = Path("/tmp/out")
 
 
 def _base():
-    return [config.PYTHON, "-m", "carvx", SOURCE, "-o", str(OUT), "--machine"]
+    return [config.PYTHON, "-m", "breadcrumb", SOURCE, "-o", str(OUT), "--machine"]
 
 
 def test_defaults_to_plain_carve_with_no_extra_flags():

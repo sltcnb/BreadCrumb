@@ -44,9 +44,6 @@ include = ["breadcrumb*"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-# web/ is a separate subproject slated to move to its own repo; it is not
-# part of this package's lint scope.
-extend-exclude = ["web"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

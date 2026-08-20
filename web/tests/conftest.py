@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pytest  # noqa: E402
 
-from carvx_web import config, create_app  # noqa: E402
+from breadcrumb_web import config, create_app  # noqa: E402
 
 
 @pytest.fixture

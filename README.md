@@ -254,11 +254,27 @@ Each carve lands in `<out>/<ext>/f_<offset>.<ext>` (carving) or
 Plus scan metadata: tool version, source path/size, start/finish time, options,
 optional whole-source hash. CSV and Sleuth Kit bodyfile exports are optional.
 
+## Web UI
+
+An optional Flask front-end lives in [`web/`](web/README.md): drag-and-drop a
+disk image, pick a mode, watch live progress, browse and download the carve.
+It shells out to this package (`python -m breadcrumb --machine`) rather than
+bundling a copy, so it always carves exactly what the CLI does. Flask is
+needed only for the web UI; the carver itself stays stdlib-only.
+
+```sh
+cd web
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+venv/bin/python -m breadcrumb_web        # http://127.0.0.1:5050
+```
+
 ## Tests
 
 ```sh
 pip install pytest
-pytest tests/                     # 150+ tests
+pytest tests/                     # 170+ tests
+pytest -q web/tests               # web UI (needs web/requirements.txt)
 
 # or the standalone integration check (no pytest needed):
 python3 tests/make_test_image.py

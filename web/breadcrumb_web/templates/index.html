@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CarvX — Signature-based File Carver</title>
+    <title>BreadCrumb — Signature-based File Carver</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
@@ -274,11 +274,11 @@
 <body>
     <header class="header">
         <div class="header__brand">
-            <span class="mdi mdi-magnify-scan"></span> CarvX
+            <span class="mdi mdi-magnify-scan"></span> BreadCrumb
             <small>file carver &amp; undelete</small>
         </div>
         <div class="header__spacer"></div>
-        <a class="icon-btn" href="https://github.com/carvx/carvx" title="GitHub" target="_blank" rel="noopener">
+        <a class="icon-btn" href="https://github.com/sltcnb/BreadCrumb" title="GitHub" target="_blank" rel="noopener">
             <span class="mdi mdi-github"></span>
         </a>
         <button class="icon-btn" id="theme-toggle" title="Toggle theme">
@@ -416,7 +416,7 @@
             <!-- 5. BitLocker -->
             <div class="card">
                 <h2 id="step5"><span class="step">5</span> BitLocker <span style="font-weight:400;font-size:.8rem;color:var(--fg-faint)">optional</span></h2>
-                <p class="field-desc">Unlock BitLocker-encrypted NTFS volumes. Credentials go to the local server and are passed to carvx via its environment — never on the command line.</p>
+                <p class="field-desc">Unlock BitLocker-encrypted NTFS volumes. Credentials go to the local server and are passed to BreadCrumb via its environment — never on the command line.</p>
                 <div class="grid">
                     <div>
                         <label class="lbl" for="bitlocker-key">Recovery key (48 digits)</label>
@@ -434,7 +434,7 @@
                 <h2 id="step6"><span class="step">6</span> Run</h2>
                 <div class="runbar">
                     <button class="btn btn--primary" id="run-btn" disabled>
-                        <span class="mdi mdi-play"></span> Run CarvX
+                        <span class="mdi mdi-play"></span> Run BreadCrumb
                     </button>
                     <button class="btn btn--secondary hidden" id="cancel-btn">
                         <span class="mdi mdi-stop"></span> Cancel
@@ -472,11 +472,11 @@
             root.setAttribute('data-md-color-scheme', t === 'dark' ? 'slate' : 'default');
             themeBtn.querySelector('.mdi').className = 'mdi ' + (t === 'dark' ? 'mdi-weather-sunny' : 'mdi-weather-night');
         }
-        applyTheme(localStorage.getItem('carvx-theme')
+        applyTheme(localStorage.getItem('breadcrumb-theme')
             || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
         themeBtn.addEventListener('click', () => {
             const next = root.getAttribute('data-md-color-scheme') === 'slate' ? 'light' : 'dark';
-            localStorage.setItem('carvx-theme', next);
+            localStorage.setItem('breadcrumb-theme', next);
             applyTheme(next);
         });
 
@@ -673,7 +673,7 @@
 
         function resetRun(msg) {
             runBtn.disabled = false;
-            runBtn.innerHTML = '<span class="mdi mdi-play"></span> Run CarvX';
+            runBtn.innerHTML = '<span class="mdi mdi-play"></span> Run BreadCrumb';
             if (msg) alert(msg);
         }
 

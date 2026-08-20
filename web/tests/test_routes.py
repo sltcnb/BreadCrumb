@@ -7,7 +7,7 @@ import uuid
 
 import pytest
 
-from carvx_web.routes import allowed_file
+from breadcrumb_web.routes import allowed_file
 
 
 # ------------------------------------------------------------- allowed_file
@@ -28,6 +28,18 @@ from carvx_web.routes import allowed_file
 ])
 def test_allowed_file(filename, expected):
     assert allowed_file(filename) is expected
+
+
+# ------------------------------------------------------------------- index
+
+def test_index_renders_with_the_carver_type_list(client):
+    """Smoke test for the one page that pulls in the core carver: the type
+    list comes from `--list-types`, so a broken coupling shows up here."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "BreadCrumb" in body
+    assert "png" in body and "sqlite" in body
 
 
 # -------------------------------------------------------- upload / secure_filename

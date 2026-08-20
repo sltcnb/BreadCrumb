@@ -1,6 +1,6 @@
-# CarvX Web
+# BreadCrumb Web
 
-Flask web interface for the carvX carver. Runs the real `carvx` package
+Flask web interface for the BreadCrumb carver. Runs the real `breadcrumb` package
 from the repo root — no bundled copy — so it always matches the CLI.
 
 ## Quick Start
@@ -9,7 +9,7 @@ from the repo root — no bundled copy — so it always matches the CLI.
 cd web
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
-venv/bin/python -m carvx_web
+venv/bin/python -m breadcrumb_web
 
 # open http://127.0.0.1:5050
 ```
@@ -17,10 +17,10 @@ venv/bin/python -m carvx_web
 Binds to `127.0.0.1` by default. To expose on the network (only on a
 trusted LAN — there is no authentication, and `POST /upload/path` will
 read any file path reachable by the server process), you must opt in
-with `CARVX_WEB_ALLOW_REMOTE=1`; otherwise the app refuses to start:
+with `BREADCRUMB_WEB_ALLOW_REMOTE=1`; otherwise the app refuses to start:
 
 ```bash
-CARVX_WEB_HOST=0.0.0.0 PORT=8080 CARVX_WEB_ALLOW_REMOTE=1 venv/bin/python -m carvx_web
+BREADCRUMB_WEB_HOST=0.0.0.0 PORT=8080 BREADCRUMB_WEB_ALLOW_REMOTE=1 venv/bin/python -m breadcrumb_web
 ```
 
 Behind a real WSGI server:
@@ -34,10 +34,10 @@ venv/bin/gunicorn wsgi:app
 - **Upload disk images** by drag-and-drop (multi-file for split segments:
   `.e01/.e02`, `.001/.002`) or reference an existing path in place (no copy)
 - **Modes**: signature carve, NTFS / ext4 / FAT / HFS+ / APFS undelete, auto
-- **Live progress**: streamed from carvx `--machine` JSON events
+- **Live progress**: streamed from BreadCrumb `--machine` JSON events
   (percent, MiB/s, ETA, files carved), with cancel
 - **BitLocker**: recovery key or password, passed via environment
-  (`CARVX_BITLOCKER`), never on the command line
+  (`BREADCRUMB_BITLOCKER`), never on the command line
 - **Results**: file table with offsets/hashes/confidence, image gallery,
   CSV / HTML report / timeline, per-file or ZIP download
 

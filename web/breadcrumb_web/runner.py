@@ -1,6 +1,6 @@
-"""Carvx subprocess orchestration: command building, live watching, cancel.
+"""BreadCrumb subprocess orchestration: command building, live watching, cancel.
 
-Runs the real carvx package from the repo root via `python -m carvx
+Runs the real breadcrumb package from the repo root via `python -m breadcrumb
 --machine` and streams its JSON-lines events into persisted job progress.
 Live process handles live here in memory; job metadata lives on disk.
 """
@@ -21,7 +21,7 @@ _canceled: set[str] = set()
 
 def get_supported_types() -> list[dict]:
     result = subprocess.run(
-        [config.PYTHON, "-m", "carvx", "--list-types"],
+        [config.PYTHON, "-m", config.CORE_PACKAGE, "--list-types"],
         capture_output=True, text=True, cwd=config.REPO_ROOT, timeout=30)
     types = []
     for line in result.stdout.splitlines()[1:]:          # skip header
@@ -33,7 +33,7 @@ def get_supported_types() -> list[dict]:
 
 
 def build_command(data: dict, source: str, output_dir: Path) -> list[str]:
-    cmd = [config.PYTHON, "-m", "carvx", source,
+    cmd = [config.PYTHON, "-m", config.CORE_PACKAGE, source,
            "-o", str(output_dir), "--machine"]
     mode = data.get("mode", "carve")
     flag = config.MODES.get(mode)

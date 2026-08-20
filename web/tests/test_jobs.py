@@ -7,7 +7,7 @@ import uuid
 import pytest
 from werkzeug.exceptions import BadRequest
 
-from carvx_web.jobs import valid_job_id
+from breadcrumb_web.jobs import valid_job_id
 
 
 def test_accepts_a_real_uuid4():
