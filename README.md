@@ -266,7 +266,8 @@ breadcrumb[bitlocker]`) swaps in C-backed AES for a large speedup.
 - Unvalidated carves (rar, legacy sqlite, gz at window edge) may have junk
   appended at the tail — the real data is at the front.
 - Throughput is roughly 150–250 MiB/s single-threaded; mostly bounded by
-  the regex scan and source read speed.
+  the regex scan and source read speed. `-j 0` scales it across cores, and the
+  [Rust port](#rust-port) carves the same bytes several times faster.
 - Operate on a read-only image (`dd`/`ddrescue` copy) of evidence, never on
   the original — standard forensic practice.
 
@@ -278,6 +279,19 @@ Each carve lands in `<out>/<ext>/f_<offset>.<ext>` (carving) or
 `validated`/`confidence`, `duplicate_of`, and (NTFS) original name + timestamps.
 Plus scan metadata: tool version, source path/size, start/finish time, options,
 optional whole-source hash. CSV and Sleuth Kit bodyfile exports are optional.
+
+## Rust port
+
+[breadcrumb-rs](https://github.com/sltcnb/breadcrumb-rs) ports the **carving
+core** to Rust for throughput: 20 of the 26 signature types, same handlers, same
+output layout. Manifests from the two tools agree byte for byte — matching
+`(offset, size, sha256, ext, validated, duplicate_of)` on every record — and the
+scan runs about 7x faster, since a native multi-pattern matcher with a SIMD
+prefilter replaces the `re` alternation that dominates the Python profile.
+
+Everything past the carve stays here: the filesystem undelete modes, BitLocker,
+the EWF/QCOW2/VMDK readers, `--validate`, `--grep`, and the derived reports. This
+implementation is the reference.
 
 ## Web UI
 
