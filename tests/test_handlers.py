@@ -2,6 +2,7 @@
 
 import io
 import os
+import random
 import zipfile
 
 import pytest
@@ -25,6 +26,11 @@ class BytesReader:
 
 def window(data: bytes, base: int = 0, limit: int | None = None) -> Window:
     return Window(BytesReader(data), base, limit if limit is not None else len(data) - base)
+
+
+def junk(n: int) -> bytes:
+    """Seeded filler. See the note on the `image` fixture in test_carver.py."""
+    return random.Random(7).randbytes(n)
 
 
 CASES = [
@@ -74,7 +80,7 @@ def test_exact_size_on_valid_file(key, sig_name, ext):
     data = builders.BUILDERS[key]()
     sig = BY_NAME[sig_name]
     # trailing junk must not change the carved size
-    carve = sig.handler(window(data + os.urandom(2000)))
+    carve = sig.handler(window(data + junk(2000)))
     assert carve is not None, f"{key}: handler rejected valid file"
     assert carve.size == len(data), f"{key}: size {carve.size} != {len(data)}"
     assert carve.ext == ext
