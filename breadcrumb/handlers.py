@@ -9,7 +9,7 @@ appended at the tail).
 """
 
 import zlib
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Tuple
 
 from .reader import Window
 
@@ -450,7 +450,14 @@ _MP3_BITRATES = {
 _MP3_RATES = {3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}
 
 
-def _mp3_frame_len(h: bytes) -> Optional[int]:
+def _mp3_frame(h: bytes) -> Optional[Tuple[int, Tuple[int, int, int]]]:
+    """Frame length and stream profile for a frame header, or None.
+
+    The profile -- MPEG version, layer, sample rate -- is fixed for the whole
+    stream; only the bitrate may change frame to frame (VBR). Callers walking
+    the frame chain use it to tell a real next frame from trailing data that
+    merely happens to look like a header.
+    """
     if len(h) < 4 or h[0] != 0xFF or (h[1] & 0xE0) != 0xE0:
         return None
     version = (h[1] >> 3) & 0x03                 # 0=2.5, 2=2, 3=1
@@ -466,10 +473,11 @@ def _mp3_frame_len(h: bytes) -> Optional[int]:
         return None
     bitrate = _MP3_BITRATES[(vgroup, lnum)][br_idx] * 1000
     rate = _MP3_RATES[version][sr_idx]
+    profile = (version, layer, sr_idx)
     if lnum == 1:
-        return (12 * bitrate // rate + pad) * 4
+        return (12 * bitrate // rate + pad) * 4, profile
     coeff = 144 if (lnum == 2 or vgroup == 1) else 72
-    return coeff * bitrate // rate + pad
+    return coeff * bitrate // rate + pad, profile
 
 
 def carve_mp3(w: Window) -> Optional[Carve]:
@@ -480,12 +488,16 @@ def carve_mp3(w: Window) -> Optional[Carve]:
         return None
     pos = 10 + (h[6] << 21 | h[7] << 14 | h[8] << 7 | h[9])  # synchsafe size
     frames = 0
+    profile = None
     while pos + 4 <= w.limit:
-        flen = _mp3_frame_len(w.read(pos, 4))
-        if flen is None:
-            if w.read(pos, 3) == b"TAG":         # trailing ID3v1
-                pos += 128
+        frame = _mp3_frame(w.read(pos, 4))
+        # A header whose profile differs from the first frame's ends the
+        # stream: it is trailing data that happens to sync, not a frame.
+        if frame is None or (profile is not None and frame[1] != profile):
+            if w.read(pos, 3) == b"TAG" and pos + 128 <= w.limit:
+                pos += 128                       # trailing ID3v1
             break
+        flen, profile = frame
         if pos + flen > w.limit:                 # frame truncated at EOF/limit
             break
         pos += flen
