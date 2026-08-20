@@ -3,8 +3,8 @@
 
 import pytest
 
-import carvx.reader as reader_mod
-from carvx.reader import Reader, Window
+import breadcrumb.reader as reader_mod
+from breadcrumb.reader import Reader, Window
 
 
 @pytest.fixture
@@ -105,5 +105,5 @@ def test_windows_aligned_device_path(sample, monkeypatch):
 
 def test_windows_device_size_helper_importable():
     """The IOCTL size helper exists and is callable (real call needs Windows)."""
-    import carvx.reader as rm
+    import breadcrumb.reader as rm
     assert callable(rm._windows_device_size)

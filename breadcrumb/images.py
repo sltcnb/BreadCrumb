@@ -522,11 +522,11 @@ class EwfReader:
 class StdinReader(Reader):
     """Spool a non-seekable stream (stdin / pipe) to a temp file, then read it
     with random access. Handlers need to seek, so a pipe must be materialized;
-    this supports `dd if=/dev/sdb | carvx -` up to available temp-disk space."""
+    this supports `dd if=/dev/sdb | bcrumb -` up to available temp-disk space."""
 
     def __init__(self, stream=None, spool_dir=None):
         stream = stream if stream is not None else sys.stdin.buffer
-        fd, self._tmp = tempfile.mkstemp(prefix="carvx_stdin_", dir=spool_dir)
+        fd, self._tmp = tempfile.mkstemp(prefix="breadcrumb_stdin_", dir=spool_dir)
         try:
             try:
                 while True:
@@ -558,7 +558,7 @@ class StdinReader(Reader):
 
 def open_source(path: str):
     """Detect the image format, then transparently decrypt BitLocker volumes if
-    a credential is configured (env CARVX_BITLOCKER); else return the raw reader."""
+    a credential is configured (env BREADCRUMB_BITLOCKER); else return the raw reader."""
     reader = _open_raw(path)
     from . import bitlocker
     creds = bitlocker.Credentials.from_env()

@@ -3,8 +3,8 @@
 import struct
 
 
-from carvx.partition import parse, detect_fs, FS_TO_MODE
-from carvx.reader import Reader
+from breadcrumb.partition import parse, detect_fs, FS_TO_MODE
+from breadcrumb.reader import Reader
 
 
 def _mbr_disk(tmp_path, parts):

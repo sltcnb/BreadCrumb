@@ -10,7 +10,7 @@ import os
 import pytest
 
 import fat_builder
-from carvx.fat import recover_fat
+from breadcrumb.fat import recover_fat
 
 
 def _check(kind, tmp_path):

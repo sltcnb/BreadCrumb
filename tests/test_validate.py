@@ -2,9 +2,9 @@
 
 
 import builders
-from carvx import validate
-from carvx.carver import Carver, Options
-from carvx.signatures import SIGNATURES
+from breadcrumb import validate
+from breadcrumb.carver import Carver, Options
+from breadcrumb.signatures import SIGNATURES
 
 
 def run(path, out, **kw):

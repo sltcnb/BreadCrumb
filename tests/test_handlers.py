@@ -7,9 +7,9 @@ import zipfile
 import pytest
 
 import builders
-from carvx import handlers
-from carvx.reader import Window
-from carvx.signatures import BY_NAME
+from breadcrumb import handlers
+from breadcrumb.reader import Window
+from breadcrumb.signatures import BY_NAME
 
 
 class BytesReader:

@@ -209,7 +209,7 @@ def build(path):
 
 if __name__ == "__main__":
     import tempfile
-    p, exp = build(os.path.join(tempfile.gettempdir(), "carvx_ntfs.img"))
+    p, exp = build(os.path.join(tempfile.gettempdir(), "breadcrumb_ntfs.img"))
     print("built", p)
     for num, (name, sha, size, deleted) in exp.items():
         print(f"  mft {num}: {name} {size}B deleted={deleted}")

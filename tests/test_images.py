@@ -14,8 +14,8 @@ import zlib
 import pytest
 
 import builders
-from carvx.images import (open_source, SplitRawReader, Qcow2Reader, EwfReader)
-from carvx.reader import Reader
+from breadcrumb.images import (open_source, SplitRawReader, Qcow2Reader, EwfReader)
+from breadcrumb.reader import Reader
 
 QEMU = shutil.which("qemu-img") or (
     "/opt/homebrew/bin/qemu-img"
@@ -87,8 +87,8 @@ def test_qemu_format_roundtrip(raw_image, tmp_path, fmt, extra):
 
 @pytest.mark.skipif(not QEMU, reason="qemu-img not installed")
 def test_carve_through_qcow2_matches_raw(raw_image, tmp_path):
-    from carvx.carver import Carver, Options
-    from carvx.signatures import SIGNATURES
+    from breadcrumb.carver import Carver, Options
+    from breadcrumb.signatures import SIGNATURES
     path, _ = raw_image
     out = tmp_path / "img.qcow2"
     subprocess.run([QEMU, "convert", "-f", "raw", "-O", "qcow2", "-c",
@@ -200,7 +200,7 @@ def test_open_source_falls_back_to_raw(tmp_path):
 
 def test_stdin_reader_spools_and_reads(tmp_path):
     import io
-    from carvx.images import StdinReader
+    from breadcrumb.images import StdinReader
     data = bytes(range(256)) * 500
     r = StdinReader(stream=io.BytesIO(data))
     try:

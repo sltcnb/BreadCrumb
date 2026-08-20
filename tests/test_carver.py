@@ -10,8 +10,8 @@ import sys
 import pytest
 
 import builders
-from carvx.carver import Carver, Options
-from carvx.signatures import SIGNATURES, resolve_types
+from breadcrumb.carver import Carver, Options
+from breadcrumb.signatures import SIGNATURES, resolve_types
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -161,7 +161,7 @@ def test_bmp_nonzero_reserved_fields_carved_end_to_end(tmp_path):
 def test_parallel_matches_serial(image, tmp_path):
     path, expected = image
     serial = run_carver(path, tmp_path / "s")
-    from carvx.carver import run_parallel
+    from breadcrumb.carver import run_parallel
     opts = Options(out_dir=str(tmp_path / "p"), quiet=True,
                    chunk_size=1 << 20)         # small chunks: force many ranges
     parallel, _ = run_parallel(path, list(SIGNATURES), opts, jobs=4)
@@ -186,7 +186,7 @@ def test_dedup_marks_duplicates(tmp_path):
 def test_cli_end_to_end(image, tmp_path):
     path, expected = image
     out = tmp_path / "out"
-    r = subprocess.run([sys.executable, "-m", "carvx", path, "-o", str(out), "-q"],
+    r = subprocess.run([sys.executable, "-m", "breadcrumb", path, "-o", str(out), "-q"],
                        cwd=ROOT, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     manifest = json.loads((out / "manifest.json").read_text())

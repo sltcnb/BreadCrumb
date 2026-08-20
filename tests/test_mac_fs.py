@@ -13,8 +13,8 @@ import os
 import pytest
 
 import mac_fs_builder
-from carvx.apfs import recover_apfs
-from carvx.hfsplus import recover_hfs
+from breadcrumb.apfs import recover_apfs
+from breadcrumb.hfsplus import recover_hfs
 
 
 # ---------------------------------------------------------------- HFS+

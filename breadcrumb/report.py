@@ -1,4 +1,4 @@
-"""Post-processing of a carvx manifest: timeline + HTML report.
+"""Post-processing of a BreadCrumb manifest: timeline + HTML report.
 
 Both read a manifest.json produced by any mode and write a derived artifact.
 Kept separate from the scan so they can be re-run on an existing manifest.
@@ -112,7 +112,7 @@ def write_html_report(manifest: dict, path: str, out_root: str = "") -> int:
     cards = "".join(f"<span class=chip>{html.escape(e)} <b>{n}</b></span>"
                     for e, n in by_ext.most_common())
     doc = f"""<!doctype html><html><head><meta charset=utf-8>
-<title>carvX report</title>
+<title>BreadCrumb report</title>
 <style>
  body{{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#222;background:#fafafa}}
  h1{{margin:0 0 .25rem}} .sub{{color:#666;margin-bottom:1rem}}
@@ -128,8 +128,8 @@ def write_html_report(manifest: dict, path: str, out_root: str = "") -> int:
  figure img{{width:100%;height:100px;object-fit:contain;background:#f0f0f0}}
  figcaption{{font-size:11px;color:#555;word-break:break-all;margin-top:.3rem}}
 </style></head><body>
-<h1>carvX recovery report</h1>
-<div class=sub>{html.escape(manifest.get('tool', 'carvx'))} &middot;
+<h1>BreadCrumb recovery report</h1>
+<div class=sub>{html.escape(manifest.get('tool', 'BreadCrumb'))} &middot;
  source {html.escape(str(manifest.get('source', '')))} &middot;
  {len(files):,} files &middot; {total / (1 << 20):,.1f} MiB</div>
 <div>{cards}</div>

@@ -1,12 +1,12 @@
-# Contributing to carvX
+# Contributing to BreadCrumb
 
-Thanks for your interest in improving carvX. This document covers how to set up
+Thanks for your interest in improving BreadCrumb. This document covers how to set up
 a development environment, the project's ground rules, and how to submit
 changes.
 
 ## Design constraints
 
-carvX has one hard rule: the runtime is **pure Python 3.10+, standard library
+BreadCrumb has one hard rule: the runtime is **pure Python 3.10+, standard library
 only**. Do not add mandatory third-party dependencies. Optional accelerators
 (e.g. `cryptography`, `Pillow`, `pyewf`, `pyahocorasick`) are allowed **only**
 if the feature degrades gracefully to a stdlib implementation when the package
@@ -37,8 +37,8 @@ they pass locally before opening a PR.
 
 ## Adding a new file-type signature
 
-Signatures live in `carvx/signatures.py`; end-of-file detection logic lives in
-`carvx/handlers.py`. When adding a type:
+Signatures live in `breadcrumb/signatures.py`; end-of-file detection logic lives in
+`breadcrumb/handlers.py`. When adding a type:
 
 1. Add the magic bytes and a reasonable `max_size` in `signatures.py`.
 2. If the format has a determinable length, add a handler in `handlers.py`.
@@ -58,7 +58,7 @@ Signatures live in `carvx/signatures.py`; end-of-file detection logic lives in
 
 ## Reporting bugs
 
-Open an issue with the carvX version/commit, your OS and Python version, the
+Open an issue with the BreadCrumb version/commit, your OS and Python version, the
 command you ran, and — for parsing bugs — a **synthetic** reproducer image
 (never real evidence). Security issues should follow [SECURITY.md](SECURITY.md)
 instead.

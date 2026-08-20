@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "carvx"
+name = "breadcrumb"
 version = "0.1.0"
 description = "Signature-based file carver for disk images and block devices (photorec-style)"
 readme = "README.md"
@@ -31,19 +31,22 @@ Repository = "https://github.com/sltcnb/BreadCrumb"
 Issues = "https://github.com/sltcnb/BreadCrumb/issues"
 
 [project.optional-dependencies]
-# Optional accelerator. carvx decrypts BitLocker with zero deps (pure-Python
+# Optional accelerator. BreadCrumb decrypts BitLocker with zero deps (pure-Python
 # AES); installing cryptography swaps in C-backed AES for a large speedup.
 bitlocker = ["cryptography>=3.0"]
 
 [project.scripts]
-carvx = "carvx.cli:main"
+bcrumb = "breadcrumb.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["carvx*"]
+include = ["breadcrumb*"]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# web/ is a separate subproject slated to move to its own repo; it is not
+# part of this package's lint scope.
+extend-exclude = ["web"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

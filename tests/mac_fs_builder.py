@@ -53,7 +53,7 @@ def build_hfs():
     if not dev:
         return None
     try:
-        if _run(["/sbin/newfs_hfs", "-v", "CARVX", dev]).returncode != 0:
+        if _run(["/sbin/newfs_hfs", "-v", "BREADCRUMB", dev]).returncode != 0:
             return None
         _run(["diskutil", "mount", dev])
         mnt = _mount_point(dev)
@@ -79,7 +79,7 @@ def build_apfs():
         return None
     syn = None
     try:
-        r = _run(["diskutil", "partitionDisk", dev, "GPT", "APFS", "CARVX", "100%"])
+        r = _run(["diskutil", "partitionDisk", dev, "GPT", "APFS", "BREADCRUMB", "100%"])
         if r.returncode != 0:
             return None
         # find the synthesized APFS volume (diskN s1 -> a separate synthesized disk)
@@ -103,9 +103,9 @@ def build_apfs():
 
 def _find_apfs_volume():
     out = _run(["diskutil", "list"]).stdout
-    # look for an APFS Volume CARVX line -> its disk identifier
+    # look for an APFS Volume BREADCRUMB line -> its disk identifier
     for line in out.splitlines():
-        if "CARVX" in line and "APFS Volume" in line:
+        if "BREADCRUMB" in line and "APFS Volume" in line:
             m = re.search(r"(disk\d+s\d+)\s*$", line.strip())
             if m:
                 return "/dev/" + m.group(1)

@@ -9,8 +9,8 @@ import sys
 import pytest
 
 import ntfs_builder
-from carvx.ntfs import Volume, recover_ntfs
-from carvx.reader import Reader
+from breadcrumb.ntfs import Volume, recover_ntfs
+from breadcrumb.reader import Reader
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -102,7 +102,7 @@ def test_cli_ntfs_with_bodyfile(ntfs_image, tmp_path):
     path, expected = ntfs_image
     out = tmp_path / "out"
     body = tmp_path / "bodyfile"
-    r = subprocess.run([sys.executable, "-m", "carvx", path, "--ntfs",
+    r = subprocess.run([sys.executable, "-m", "breadcrumb", path, "--ntfs",
                         "-o", str(out), "--bodyfile", str(body), "-q"],
                        cwd=ROOT, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()

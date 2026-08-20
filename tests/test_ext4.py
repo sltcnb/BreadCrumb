@@ -1,7 +1,7 @@
 """ext4 undelete tests.
 
 Builds a real ext4 image with mke2fs + debugfs (from e2fsprogs) and deletes
-files, then checks carvx recovers them by name + content. Skips cleanly if
+files, then checks breadcrumb recovers them by name + content. Skips cleanly if
 e2fsprogs is not installed.
 """
 
@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-from carvx.ext4 import recover_ext4
+from breadcrumb.ext4 import recover_ext4
 
 # e2fsprogs ships in /usr/sbin on Linux, or Homebrew's keg on macOS.
 _SEARCH = [os.environ.get("PATH", ""),

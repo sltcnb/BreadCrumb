@@ -89,7 +89,7 @@ class Credentials:
 
     @classmethod
     def from_env(cls) -> "Credentials | None":
-        raw = os.environ.get("CARVX_BITLOCKER")
+        raw = os.environ.get("BREADCRUMB_BITLOCKER")
         if not raw:
             return None
         import json

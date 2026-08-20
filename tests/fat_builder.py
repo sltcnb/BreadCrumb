@@ -34,8 +34,8 @@ def _macos_build(kind: str, files: dict, delete: list):
         if r.returncode != 0:
             return None
         dev = r.stdout.split()[0]
-        fmt = ([newfs, "-v", "CARVX", dev] if kind == "exfat"
-               else [newfs, "-F", "32", "-v", "CARVX", dev])
+        fmt = ([newfs, "-v", "BREADCRUMB", dev] if kind == "exfat"
+               else [newfs, "-F", "32", "-v", "BREADCRUMB", dev])
         if _run(fmt).returncode != 0:
             return None
         _run(["diskutil", "mount", dev])
