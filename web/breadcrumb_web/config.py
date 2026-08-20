@@ -4,9 +4,15 @@ import re
 import sys
 from pathlib import Path
 
-PACKAGE_ROOT = Path(__file__).resolve().parent          # carvx_web/
+PACKAGE_ROOT = Path(__file__).resolve().parent          # breadcrumb_web/
 WEB_ROOT = PACKAGE_ROOT.parent                          # web/
-REPO_ROOT = WEB_ROOT.parent                             # carvX/ (contains carvx/)
+REPO_ROOT = WEB_ROOT.parent                             # BreadCrumb/ (contains breadcrumb/)
+
+# The core carver is invoked as `python -m <CORE_PACKAGE>` from REPO_ROOT, and
+# BitLocker credentials are handed to it through BITLOCKER_ENV. Both names are
+# owned by the core package; tests/test_core_coupling.py checks they still fit.
+CORE_PACKAGE = "breadcrumb"
+BITLOCKER_ENV = "BREADCRUMB_BITLOCKER"
 
 DATA_DIR = WEB_ROOT / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"

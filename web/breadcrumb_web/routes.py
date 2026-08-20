@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 from . import config, runner
 from .jobs import job_path, load_job, now, save_job, valid_job_id
 
-bp = Blueprint("carvx", __name__)
+bp = Blueprint("breadcrumb", __name__)
 
 
 # ---------------------------------------------------------------- helpers
@@ -95,7 +95,7 @@ def upload_path():
 
 
 @bp.route("/run", methods=["POST"])
-def run_carvx():
+def run_breadcrumb():
     data = request.get_json(silent=True) or {}
     job_id = valid_job_id(data.get("job_id", ""))
     job = load_job(job_id)
@@ -110,7 +110,7 @@ def run_carvx():
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = runner.build_command(data, job["source"], output_dir)
 
-    # BitLocker credentials go through the environment (CARVX_BITLOCKER),
+    # BitLocker credentials go through the environment (config.BITLOCKER_ENV),
     # never through argv, so they are not visible in `ps` or job records.
     env = os.environ.copy()
     creds = {}
@@ -119,7 +119,7 @@ def run_carvx():
     if data.get("bitlocker_password"):
         creds["password"] = data["bitlocker_password"]
     if creds:
-        env["CARVX_BITLOCKER"] = json.dumps(creds)
+        env[config.BITLOCKER_ENV] = json.dumps(creds)
 
     job.update(status="running", mode=data.get("mode", "carve"),
                command=" ".join(c for c in cmd), started=now(),
@@ -224,7 +224,7 @@ def download_all(job_id):
     finally:
         os.unlink(tmp)
     return send_file(fh, mimetype="application/zip", as_attachment=True,
-                     download_name=f"carvx_{job_id}.zip")
+                     download_name=f"breadcrumb_{job_id}.zip")
 
 
 @bp.route("/delete/<job_id>", methods=["POST", "DELETE"])
