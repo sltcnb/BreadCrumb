@@ -18,20 +18,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 @pytest.fixture
 def image(tmp_path):
-    """Synthetic image: every builder's file at a sector-aligned offset."""
-    random.seed(7)
+    """Synthetic image: every builder's file at a sector-aligned offset.
+
+    The junk between files is seeded, not os.urandom: handlers that scan for
+    continuations (mp3 frame sync) can read genuinely random filler as more
+    file, so unseeded junk makes the byte-exact assertions below flake.
+    """
+    rnd = random.Random(7)
     expected = {}
     path = tmp_path / "test.img"
     with open(path, "wb") as img:
         img.write(b"\x00" * 4096)
         for name, builder in builders.BUILDERS.items():
-            img.write(os.urandom(random.randint(1000, 5000)))
+            img.write(rnd.randbytes(rnd.randint(1000, 5000)))
             img.write(b"\x00" * (-img.tell() % 512))
             offset = img.tell()
             data = builder()
             img.write(data)
             expected[name] = (offset, len(data), hashlib.sha256(data).hexdigest())
-        img.write(os.urandom(3000))
+        img.write(rnd.randbytes(3000))
     return str(path), expected
 
 
