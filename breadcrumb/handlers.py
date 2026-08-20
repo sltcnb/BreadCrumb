@@ -239,12 +239,14 @@ def carve_pdf(w: Window) -> Optional[Carve]:
     if last < 0:
         return None
     end = last + 5
+    # Take the single line terminator that ends the %%EOF line -- CRLF, or a
+    # bare CR/LF. Consuming every EOL byte here also swallows trailing data
+    # that merely happens to start with one.
     tail = w.read(end, 2)
-    for c in tail:
-        if c in (0x0D, 0x0A):
-            end += 1
-        else:
-            break
+    if tail[:2] == b"\r\n":
+        end += 2
+    elif tail[:1] in (b"\r", b"\n"):
+        end += 1
     return Carve(end, "pdf", True)
 
 
