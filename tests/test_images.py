@@ -1,10 +1,13 @@
 """Image-format reader tests.
 
 Split-raw, QCOW2, and VMDK are verified against qemu-img output when qemu-img
-is available (else skipped). EWF is exercised with a minimal hand-built
-uncompressed E01 so the section/table parser is covered without libewf.
+is available (else skipped). EWF is covered twice over: hand-built images
+exercise the section/table parser with no dependencies, and where libewf is
+installed, ewfacquire-produced images (several formats, compression settings,
+and a segmented set) are compared byte for byte against the raw source.
 """
 
+import glob
 import os
 import shutil
 import struct
@@ -14,12 +17,22 @@ import zlib
 import pytest
 
 import builders
-from breadcrumb.images import (open_source, SplitRawReader, Qcow2Reader, EwfReader)
+from breadcrumb.images import (open_source, SplitRawReader, Qcow2Reader, EwfReader,
+                               EwfPyReader)
 from breadcrumb.reader import Reader
 
-QEMU = shutil.which("qemu-img") or (
-    "/opt/homebrew/bin/qemu-img"
-    if os.path.exists("/opt/homebrew/bin/qemu-img") else None)
+def _tool(name):
+    return shutil.which(name) or (f"/opt/homebrew/bin/{name}"
+                                  if os.path.exists(f"/opt/homebrew/bin/{name}") else None)
+
+
+QEMU = _tool("qemu-img")
+EWFACQUIRE = _tool("ewfacquire")
+try:
+    import pyewf                                 # noqa: F401  (probe only)
+    PYEWF = True
+except ImportError:
+    PYEWF = False
 
 
 @pytest.fixture
@@ -106,14 +119,16 @@ def test_carve_through_qcow2_matches_raw(raw_image, tmp_path):
 
 # ---------------------------------------------------------------- EWF (E01)
 
-def _build_uncompressed_e01(path, payload, chunk_sectors=2, bps=512):
-    """Minimal single-segment uncompressed EWF with one sectors+table section."""
-    def section(stype, body, next_off_placeholder=0):
-        return stype, body
+def _build_e01(path, payload, chunk_sectors=2, bps=512, compress=False):
+    """Minimal single-segment EWF with one sectors+table section.
 
+    Field offsets follow libewf's ewf_volume exactly -- a builder that mirrors
+    a parser's own idea of the layout proves nothing.
+    """
     chunk_size = chunk_sectors * bps
-    chunks = [payload[i:i + chunk_size] for i in range(0, len(payload), chunk_size)]
-    chunks = [c.ljust(chunk_size, b"\x00") for c in chunks]
+    raw_chunks = [payload[i:i + chunk_size]
+                  for i in range(0, len(payload), chunk_size)]
+    raw_chunks = [c.ljust(chunk_size, b"\x00") for c in raw_chunks]
     total_sectors = (len(payload) + bps - 1) // bps
 
     out = bytearray()
@@ -124,9 +139,7 @@ def _build_uncompressed_e01(path, payload, chunk_sectors=2, bps=512):
         nonlocal out
         start = len(out)
         desc = bytearray(76)
-        name = stype[:15] + b"\x00" * (16 - len(stype[:15]))
-        desc[:16] = name
-        # next_offset and size filled after we know body length
+        desc[:16] = stype[:15] + b"\x00" * (16 - len(stype[:15]))
         size = 76 + len(body)
         struct.pack_into("<Q", desc, 16, start + size)        # next section offset
         struct.pack_into("<Q", desc, 24, size)
@@ -134,27 +147,31 @@ def _build_uncompressed_e01(path, payload, chunk_sectors=2, bps=512):
         out += desc + body
         return start
 
-    # volume section: chunk_count(4) sectors_per_chunk(4) bytes_per_sector(4)
-    #                 sector_count(4) + padding
+    # ewf_volume: media_type(1) unknown(3) chunk_count(4) sectors_per_chunk(4)
+    #             bytes_per_sector(4) sector_count(8) + padding
     vol = bytearray(1052)
-    struct.pack_into("<I", vol, 0, len(chunks))
-    struct.pack_into("<I", vol, 4, chunk_sectors)
-    struct.pack_into("<I", vol, 8, bps)
-    struct.pack_into("<I", vol, 12, total_sectors)
+    struct.pack_into("<B", vol, 0, 1)                     # media type: fixed disk
+    struct.pack_into("<I", vol, 4, len(raw_chunks))
+    struct.pack_into("<I", vol, 8, chunk_sectors)
+    struct.pack_into("<I", vol, 12, bps)
+    struct.pack_into("<Q", vol, 16, total_sectors)
     emit(b"volume", bytes(vol))
 
-    # sectors section holds raw chunk data
-    sectors_body = b"".join(chunks)
-    sectors_start = emit(b"sectors", sectors_body)
+    # sectors section holds the chunk data, compressed per chunk or raw
+    stored, entries_meta = bytearray(), []
+    for chunk in raw_chunks:
+        entries_meta.append((len(stored), compress))
+        stored += zlib.compress(chunk) if compress else chunk
+    sectors_start = emit(b"sectors", bytes(stored))
     data_base = sectors_start + 76                  # absolute file offset of chunk 0
 
     # table section: count(4) pad(4) base_offset(8) pad(4) checksum(4) + entries
     thdr = bytearray(24)
-    struct.pack_into("<I", thdr, 0, len(chunks))
+    struct.pack_into("<I", thdr, 0, len(raw_chunks))
     struct.pack_into("<Q", thdr, 8, data_base)      # base offset
     entries = bytearray()
-    for i in range(len(chunks)):
-        entries += struct.pack("<I", i * chunk_size)   # relative offset, uncompressed
+    for rel, comp in entries_meta:
+        entries += struct.pack("<I", rel | (0x80000000 if comp else 0))
     emit(b"table", bytes(thdr) + bytes(entries))
     emit(b"done", b"")
 
@@ -162,18 +179,132 @@ def _build_uncompressed_e01(path, payload, chunk_sectors=2, bps=512):
         fh.write(out)
 
 
-def test_ewf_minimal_uncompressed(tmp_path):
+@pytest.mark.parametrize("compress", [False, True])
+def test_ewf_synthetic_roundtrip(tmp_path, compress):
+    """The pure-Python parser against a spec-shaped image, no libewf needed."""
     payload = bytes(range(256)) * 40 + builders.make_png()   # ~10 KiB
     e01 = tmp_path / "img.E01"
-    _build_uncompressed_e01(str(e01), payload)
+    _build_e01(str(e01), payload, compress=compress)
     r = EwfReader(str(e01))
     try:
-        # size is chunk-aligned; the payload prefix must match exactly
-        assert r.size >= len(payload)
+        # the sector count in the volume section gives an exact media size,
+        # not merely the chunk-aligned upper bound
+        assert r.size == 512 * ((len(payload) + 511) // 512)
         assert r.pread(0, len(payload)) == payload
         assert r.pread(100, 50) == payload[100:150]
+        assert r.pread(1000, 2000) == payload[1000:3000]     # spans chunks
     finally:
         r.close()
+
+
+# ------------------------------------------------- EWF against real libewf
+#
+# ewfacquire writes the images; the readers must agree with the raw source
+# byte for byte. This is the check that catches a misread volume/table field
+# -- a hand-built image can only ever confirm our own reading of the spec.
+
+@pytest.fixture
+def sector_aligned_image(tmp_path):
+    """Raw image whose length is a whole number of sectors, with carvable
+    files in it. ewfacquire images in sector units, so an unaligned tail
+    would be dropped and every byte-exact assertion below would fail for
+    reasons that have nothing to do with EWF."""
+    data = bytearray()
+    while len(data) < 200 * 1024:
+        data += b"\x11" * 3000 + builders.make_png() + builders.make_jpeg()
+    data = bytes(data[:200 * 1024])            # 400 sectors, ~7 chunks at -b 64
+    p = tmp_path / "raw.img"
+    p.write_bytes(data)
+    return str(p), data
+
+
+def _acquire(raw_path, stem, fmt="encase6", compression="best", extra=()):
+    """Write an EWF set with ewfacquire; returns the first segment's path."""
+    subprocess.run([EWFACQUIRE, "-u", "-t", stem, "-f", fmt, "-c", compression,
+                    "-b", "64", *extra, raw_path], check=True, capture_output=True)
+    segs = sorted(glob.glob(stem + ".*"))
+    assert segs, f"ewfacquire wrote nothing for {fmt}/{compression}"
+    return segs[0], segs
+
+
+@pytest.mark.skipif(not EWFACQUIRE, reason="ewfacquire (libewf) not installed")
+@pytest.mark.parametrize("fmt,compression", [
+    ("encase6", "best"),        # deflate chunks
+    ("encase6", "none"),        # stored chunks
+    ("encase5", "fast"),
+    ("smart", "best"),          # EWF-S01: 4-byte sector count in the volume
+    ("ewfx", "best"),
+])
+def test_ewf_real_image_roundtrip(sector_aligned_image, tmp_path, fmt, compression):
+    raw_path, data = sector_aligned_image
+    first, _ = _acquire(raw_path, str(tmp_path / f"acq_{fmt}_{compression}"),
+                        fmt, compression)
+    r = EwfReader(first)
+    try:
+        assert r.size == len(data)
+        assert r.pread(0, r.size) == data
+        assert r.pread(70000, 5000) == data[70000:75000]     # spans chunks
+    finally:
+        r.close()
+
+
+@pytest.mark.skipif(not EWFACQUIRE, reason="ewfacquire (libewf) not installed")
+def test_ewf_real_multi_segment_roundtrip(tmp_path):
+    """A segmented set (.E01/.E02/...) is globbed from the first segment and
+    read as one image, including reads that span a segment boundary."""
+    data = bytearray()
+    while len(data) < 4 << 20:                 # 1 MiB is ewfacquire's floor
+        data += b"\x22" * 5000 + builders.make_png() + os.urandom(20000)
+    data = bytes(data[:4 << 20])
+    raw = tmp_path / "raw.img"
+    raw.write_bytes(data)
+
+    first, segs = _acquire(str(raw), str(tmp_path / "multi"),
+                           extra=("-S", "1MiB"))
+    assert len(segs) > 1, "expected a segmented set"
+    r = EwfReader(first)
+    try:
+        assert len(r.segments) == len(segs)
+        assert r.size == len(data)
+        assert r.pread(0, r.size) == data
+        assert r.pread((1 << 20) - 2000, 5000) == data[(1 << 20) - 2000:(1 << 20) + 3000]
+    finally:
+        r.close()
+
+
+@pytest.mark.skipif(not (EWFACQUIRE and PYEWF), reason="needs ewfacquire + pyewf")
+def test_ewf_pyewf_and_pure_python_readers_agree(sector_aligned_image, tmp_path):
+    """open_source prefers libewf when it is installed, and the two readers
+    must be interchangeable."""
+    raw_path, data = sector_aligned_image
+    first, _ = _acquire(raw_path, str(tmp_path / "acq"))
+
+    picked = open_source(first)
+    try:
+        assert isinstance(picked, EwfPyReader)
+    finally:
+        picked.close()
+
+    with EwfPyReader(first) as libewf, EwfReader(first) as pure:
+        assert libewf.size == pure.size == len(data)
+        assert libewf.pread(0, libewf.size) == pure.pread(0, pure.size) == data
+
+
+@pytest.mark.skipif(not EWFACQUIRE, reason="ewfacquire (libewf) not installed")
+def test_carve_through_ewf_matches_raw(sector_aligned_image, tmp_path):
+    from breadcrumb.carver import Carver, Options
+    from breadcrumb.signatures import SIGNATURES
+    raw_path, _ = sector_aligned_image
+    first, _ = _acquire(raw_path, str(tmp_path / "acq"))
+
+    def carve(src, odir):
+        c = Carver(src, list(SIGNATURES), Options(out_dir=str(odir), quiet=True))
+        try:
+            return sorted((r.offset, r.size, r.sha256) for r in c.run())
+        finally:
+            c.close()
+
+    assert carve(raw_path, tmp_path / "a") == carve(first, tmp_path / "b")
 
 
 def test_open_source_detects_qcow2_magic(tmp_path):

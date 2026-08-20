@@ -25,9 +25,11 @@ python3 -m breadcrumb --help
 ```
 
 Pure Python 3.10+ / stdlib only. Optional extras improve specific features:
-`Pillow` (full JPEG/PNG decode for `--validate` + JPEG bifragment), `pyewf`
-(robust EWF/E01), `pyahocorasick` (faster matching with huge signature sets).
-Disk-image formats (raw, split, EWF/E01, QCOW2, VMDK) are auto-detected.
+`Pillow` (full JPEG/PNG decode for `--validate` + JPEG bifragment),
+`libewf-python` (wider EWF/E01 coverage — `pip install breadcrumb[ewf]`;
+the module it provides is `pyewf`), `pyahocorasick` (faster matching with
+huge signature sets). Disk-image formats (raw, split, EWF/E01, QCOW2, VMDK)
+are auto-detected — see [Image formats](#image-formats).
 
 ## Usage
 
@@ -188,6 +190,29 @@ Every carve gets a SHA-256 and lands in `<out>/<ext>/f_<offset>.<ext>`.
 A JSON manifest (`<out>/manifest.json`) records offset, size, hash, and
 whether the structure parsed cleanly (`validated`) or the size is a
 best-effort fallback.
+
+## Image formats
+
+`open_source()` detects the format by magic, falling back to the extension, so
+you pass the image straight to `bcrumb` with no conversion step:
+
+| Format | Detection | Notes |
+| ------ | --------- | ----- |
+| raw / dd | default | also block devices (`/dev/diskN`) and `-` for stdin |
+| split raw | `.001/.002…`, `name.NNN` | segments globbed from the first |
+| EWF / E01 | `EVF\x09…` magic, or `.e01/.ex01/.s01/.l01` | see below |
+| QCOW2 v2/v3 | `QFI\xfb` | raw + zlib clusters |
+| VMDK | `KDMV` | flat + monolithic sparse |
+
+For EWF the built-in reader is pure Python: it walks the section list, reads
+the chunk table, and handles stored and deflate-compressed chunks, EnCase5/6,
+SMART (`.s01`) and `ewfx` layouts, and multi-segment sets (globbed from the
+first segment). Media size comes from the volume section's sector count, so
+carve offsets match the original disk exactly.
+
+Install `libewf-python` (`pip install breadcrumb[ewf]`) and libewf is used
+instead wherever it is present — needed for the variants the built-in reader
+does not model: **Ex01/EWF2**, bzip2-compressed chunks, and encrypted EWF.
 
 ## Filesystem & OS support
 

@@ -34,6 +34,10 @@ Issues = "https://github.com/sltcnb/BreadCrumb/issues"
 # Optional accelerator. BreadCrumb decrypts BitLocker with zero deps (pure-Python
 # AES); installing cryptography swaps in C-backed AES for a large speedup.
 bitlocker = ["cryptography>=3.0"]
+# Wider EWF/E01 coverage. The built-in reader handles stored and deflate
+# chunks and segmented sets; libewf's bindings (module `pyewf`) add the
+# variants it does not model, notably Ex01/EWF2 and bzip2 chunks.
+ewf = ["libewf-python>=20240506"]
 
 [project.scripts]
 bcrumb = "breadcrumb.cli:main"

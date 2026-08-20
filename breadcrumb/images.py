@@ -389,6 +389,7 @@ class EwfReader:
         self.chunk_size = None
         self.bytes_per_sector = 512
         self.size = 0
+        self._sector_counts = ()   # exact media size candidates, see _media_size
         self._chunks = []          # (segment_idx, file_offset, compressed)
         try:
             self._parse()
@@ -435,7 +436,6 @@ class EwfReader:
             if sig[:8] != b"EVF\x09\x0d\x0a\xff\x00":
                 raise ValueError("not an EWF/E01 image")
             offset = 13
-            table_base = 0
             while True:
                 desc = os.pread(fd, 76, offset)
                 if len(desc) < 76:
@@ -445,23 +445,23 @@ class EwfReader:
                 data_off = offset + 76
                 if stype == b"volume" or stype == b"disk":
                     vol = os.pread(fd, 1052, data_off)
-                    # EWF volume: chunk_count(4) sectors_per_chunk(4)
-                    # bytes_per_sector(4) sector_count(4) ...
-                    spc = _u32le(vol, 4)
-                    bps = _u32le(vol, 8)
+                    # ewf_volume: media_type(1) unknown(3) chunk_count(4)
+                    # sectors_per_chunk(4) bytes_per_sector(4) sector_count(8,
+                    # 4 in the SMART/EWF-S01 layout, hence both candidates)
+                    spc = _u32le(vol, 8)
+                    bps = _u32le(vol, 12)
                     self.bytes_per_sector = bps or 512
                     self.chunk_size = spc * self.bytes_per_sector
-                elif stype == b"sectors":
-                    table_base = data_off
+                    self._sector_counts = (_u64le(vol, 16), _u32le(vol, 16))
                 elif stype in (b"table",):
-                    self._parse_table(fd, sidx, data_off, table_base)
+                    self._parse_table(fd, sidx, data_off)
                 if next_off == 0 or next_off == offset:
                     break
                 offset = next_off
         if self.chunk_size:
             self.size = self._media_size()
 
-    def _parse_table(self, fd, sidx, data_off, sectors_base):
+    def _parse_table(self, fd, sidx, data_off):
         hdr = os.pread(fd, 24, data_off)
         count = _u32le(hdr, 0)
         base_off = _u64le(hdr, 8) if count and len(hdr) >= 16 else 0
@@ -473,9 +473,16 @@ class EwfReader:
             self._chunks.append((sidx, file_off, compressed))
 
     def _media_size(self):
-        # last chunk may be partial; without per-chunk sizes we assume full and
-        # rely on filesystem/carver tolerating trailing slack.
-        return len(self._chunks) * self.chunk_size
+        # The chunk table only gives a chunk-aligned upper bound, since the last
+        # chunk is usually partial. The volume section carries the exact sector
+        # count; take it when it lands inside that bound, else fall back and let
+        # the carver tolerate up to one chunk of trailing slack.
+        bound = len(self._chunks) * self.chunk_size
+        for sectors in self._sector_counts:
+            exact = sectors * self.bytes_per_sector
+            if bound - self.chunk_size < exact <= bound:
+                return exact
+        return bound
 
     def _read_chunk(self, idx):
         sidx, foff, comp = self._chunks[idx]
