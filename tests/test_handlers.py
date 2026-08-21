@@ -2,6 +2,7 @@
 
 import io
 import os
+import struct
 import random
 import zipfile
 
@@ -42,6 +43,7 @@ CASES = [
     ("pdf", "pdf", "pdf"),
     ("rtf", "rtf", "rtf"),
     ("ole", "ole", "doc"),
+    ("pst", "pst", "pst"),
     ("zip", "zip", "zip"),
     ("docx", "zip", "docx"),
     ("gz", "gz", "gz"),
@@ -140,6 +142,30 @@ def test_pdf_stops_before_next_pdf():
     assert carve is not None and carve.size == len(a)
 
 
+def test_zip_carve_stays_inside_the_archive():
+    """A fragmented archive must not be extended to a *different* archive's
+    end-of-central-directory, swallowing everything in between. Searching for a
+    trailing PK\\x05\\x06 did exactly that: a half-present docx came back as
+    200 KB of unrelated disk."""
+    whole = builders.make_zip()
+    blob = bytearray(whole[:len(whole) // 2])          # first fragment only
+    blob += junk(60_000)                               # unrelated data
+    tail_start = len(blob)
+    blob += whole                                      # an intact archive later
+
+    carve = handlers.carve_zip(window(bytes(blob)))
+    assert carve is not None
+    # The walk trusts each member's declared size, so a truncated fragment can
+    # overshoot by the missing bytes -- but never on to the next archive.
+    assert carve.size <= len(whole), f"over-carved to {carve.size}"
+    assert carve.size < tail_start
+    assert not carve.validated
+
+    # the intact archive further along still carves exactly
+    later = handlers.carve_zip(window(bytes(blob), tail_start))
+    assert later is not None and later.size == len(whole) and later.validated
+
+
 def test_gzip_multimember():
     data = builders.make_gzip() + builders.make_gzip()
     carve = handlers.carve_gzip(window(data + os.urandom(100)))
@@ -235,6 +261,65 @@ def test_ole_extension_comes_from_the_stream_name(stream, ext):
     assert carve.size == len(data)
 
 
+@pytest.mark.parametrize("guid,ext", [
+    ("00020820-0000-0000-C000-000000000046", "xls"),   # Excel Book8
+    ("00020906-0000-0000-C000-000000000046", "doc"),   # Word 8+
+    ("64818D10-4F9B-11CF-86EA-00AA00B929E8", "ppt"),   # PowerPoint 97+
+    ("000C1084-0000-0000-C000-000000000046", "msi"),   # Windows Installer
+    ("0002123D-0000-0000-C000-000000000046", "pub"),   # Publisher
+    ("00021A13-0000-0000-C000-000000000046", "vsd"),   # Visio
+])
+def test_ole_root_clsid_names_the_application(guid, ext):
+    """The root entry's CLSID is authoritative, and outranks stream names: the
+    container here carries a misleading stream name on purpose."""
+    from breadcrumb.handlers import _clsid
+    data = builders.make_ole_clsid(_clsid(guid), stream_name="WordDocument")
+    carve = handlers.carve_ole(window(data + junk(2048)))
+    assert carve is not None and carve.ext == ext
+    assert carve.size == len(data)
+
+
+_REAL_XLS = "/Applications/Numbers.app/Contents/Resources/BlankDelimited.xls"
+
+
+@pytest.mark.skipif(not os.path.exists(_REAL_XLS), reason="no real .xls on this host")
+def test_ole_handler_against_a_real_excel_file():
+    """Synthetic containers only prove self-consistency; this is a file written
+    by a real application."""
+    from breadcrumb.reader import Reader, Window as FileWindow
+    r = Reader(_REAL_XLS)
+    try:
+        carve = handlers.carve_ole(FileWindow(r, 0, r.size))
+        assert carve is not None
+        assert carve.size == r.size, "carved size must match the real file"
+        assert carve.ext == "xls"
+        assert carve.validated
+    finally:
+        r.close()
+
+
+@pytest.mark.parametrize("unicode_store,ver", [(True, 23), (False, 15)])
+def test_pst_size_comes_from_the_header(unicode_store, ver):
+    data = builders.make_pst(unicode_store=unicode_store, size=0x20000)
+    carve = handlers.carve_pst(window(data + junk(4096)))
+    assert carve is not None and carve.validated
+    assert carve.size == len(data) == 0x20000
+
+
+def test_pst_with_an_implausible_size_is_capped_not_trusted():
+    data = bytearray(builders.make_pst(size=0x20000))
+    struct.pack_into("<Q", data, 0xB8, 1 << 60)          # nonsense ibFileEof
+    carve = handlers.carve_pst(window(bytes(data)))
+    assert carve is not None and not carve.validated
+    assert carve.size <= len(data)
+
+
+def test_pst_rejects_a_foreign_client_magic():
+    data = bytearray(builders.make_pst())
+    struct.pack_into("<H", data, 8, 0x1234)              # not "SM"
+    assert handlers.carve_pst(window(bytes(data))) is None
+
+
 def test_rtf_survives_escapes_and_binary_blobs():
     """Naive brace counting breaks on \\{ escapes and on \\binN payloads that
     contain unbalanced braces; both appear in real documents."""
@@ -252,7 +337,8 @@ def test_rtf_without_a_closing_brace_is_rejected():
 def test_office_group_resolves_to_every_document_container():
     from breadcrumb.signatures import resolve_types
     names = {s.name for s in resolve_types("office")}
-    assert names == {"ole", "zip", "pdf", "rtf"}
+    assert names == {"ole", "zip", "pdf", "rtf", "pst"}
+    assert {s.name for s in resolve_types("mail")} == {"pst", "ole"}
     # and the per-application aliases still work on their own
     assert {s.name for s in resolve_types("doc,xls,ppt,docx,xlsx,pptx,pdf")} == \
         {"ole", "zip", "pdf"}

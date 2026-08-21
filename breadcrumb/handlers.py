@@ -303,6 +303,7 @@ def carve_rtf(w: Window) -> Optional[Carve]:
 # ---------------------------------------------------------------- ZIP family
 
 _ZIP_HINTS = [
+    (b"visio/", "vsdx"),
     (b"word/", "docx"),
     (b"xl/", "xlsx"),
     (b"ppt/", "pptx"),
@@ -313,34 +314,96 @@ _ZIP_HINTS = [
 ]
 
 
-def carve_zip(w: Window) -> Optional[Carve]:
+def _zip_walk_members(w: Window) -> Tuple[int, bool]:
+    """Follow local file headers from the archive start.
+
+    Returns (offset just past the last member, whether the chain stayed intact).
+    Each member is 30 bytes of header + name + extra + compressed data, so the
+    members can be accounted for exactly -- no searching. A zip written to a
+    non-seekable stream has flag bit 3 set and its sizes deferred to a data
+    descriptor; those cannot be walked, so the caller falls back to the EOCD.
+    """
     pos = 0
-    end = -1
-    validated = False
     while True:
-        eocd = w.find(b"PK\x05\x06", pos)
+        hdr = w.read(pos, 30)
+        if len(hdr) < 30 or hdr[:4] != b"PK\x03\x04":
+            return pos, True
+        flags = _u16le(hdr, 6)
+        csize = _u32le(hdr, 18)
+        name_len = _u16le(hdr, 26)
+        extra_len = _u16le(hdr, 28)
+        if flags & 0x08 and csize == 0:
+            return pos, False              # streamed: size is in the descriptor
+        if csize == 0xFFFFFFFF:
+            return pos, False              # zip64: real size is in the extra field
+        nxt = pos + 30 + name_len + extra_len + csize
+        if nxt <= pos or nxt > w.limit:
+            return pos, False              # runs off the end: truncated or fragmented
+        pos = nxt
+
+
+def carve_zip(w: Window) -> Optional[Carve]:
+    # Walk the members, then the central directory, to the EOCD. This keeps the
+    # carve inside the archive: hunting for a trailing PK\x05\x06 finds the
+    # *next* archive's directory when this one is truncated or fragmented, and
+    # carves everything in between.
+    accounted, intact = _zip_walk_members(w)
+    if intact and accounted > 0 and w.read(accounted, 4) == b"PK\x01\x02":
+        pos = accounted
+        while w.read(pos, 4) == b"PK\x01\x02":
+            ent = w.read(pos, 46)
+            if len(ent) < 46:
+                break
+            pos += 46 + _u16le(ent, 28) + _u16le(ent, 30) + _u16le(ent, 32)
+            if pos > w.limit:                         # directory runs off the end
+                pos = accounted
+                break
+        if w.read(pos, 4) == b"PK\x06\x06":          # zip64 end of central dir
+            rec = w.read(pos, 12)
+            if len(rec) == 12:
+                pos += 12 + _u64le(rec, 4)
+            if w.read(pos, 4) == b"PK\x06\x07":      # zip64 locator
+                pos += 20
+        if pos <= w.limit and w.read(pos, 4) == b"PK\x05\x06":
+            rec = w.read(pos, 22)
+            if len(rec) == 22:
+                end = pos + 22 + _u16le(rec, 20)      # + archive comment
+                if end <= w.limit:
+                    return Carve(end, _zip_ext(w, end), True)
+        # Directory parsed but no EOCD behind it: keep the members plus the
+        # directory bytes we could actually account for.
+        accounted = min(max(accounted, pos), w.limit)
+
+    # Fallback: an EOCD whose central-directory arithmetic lines up with this
+    # start really is this archive's end. Anything else is another archive's.
+    search = 0
+    while True:
+        eocd = w.find(b"PK\x05\x06", search)
         if eocd < 0:
             break
         rec = w.read(eocd, 22)
         if len(rec) == 22:
             cd_size, cd_off = _u32le(rec, 12), _u32le(rec, 16)
-            clen = _u16le(rec, 20)
-            cand = eocd + 22 + clen
-            if cand <= w.limit:
-                end = cand
-                if cd_off + cd_size == eocd:    # central dir lines up: real end
-                    validated = True
-                    break
-        pos = eocd + 1
-    if end < 0:
+            end = eocd + 22 + _u16le(rec, 20)
+            if cd_off + cd_size == eocd and end <= w.limit:
+                return Carve(end, _zip_ext(w, end), True)
+        search = eocd + 1
+
+    # Nothing conclusive: carve only the bytes actually accounted for, flagged
+    # unvalidated. The data is at the front; the tail is elsewhere on disk.
+    accounted = min(accounted, w.limit)
+    if accounted <= 0:
         return None
-    ext = "zip"
+    return Carve(accounted, _zip_ext(w, accounted), False)
+
+
+def _zip_ext(w: Window, end: int) -> str:
+    """Name the container from the paths it stores."""
     head = w.read(0, min(4096, end))
     for needle, hint in _ZIP_HINTS:
         if needle in head:
-            ext = hint
-            break
-    return Carve(end, ext, validated)
+            return hint
+    return "zip"
 
 
 # ---------------------------------------------------------------- GZIP
@@ -732,6 +795,31 @@ _OLE_HINTS = [
     (_utf16("PowerPoint Document"), "ppt"),
 ]
 
+# Root-entry CLSIDs, the authoritative statement of what an OLE2 file is.
+# GUID bytes are Data1/2/3 little-endian then Data4 big-endian, e.g.
+# {00020820-0000-0000-C000-000000000046} -> 2008020000000000c000000000000046.
+def _clsid(guid: str) -> bytes:
+    d1, d2, d3, d4, d5 = guid.split("-")
+    return (int(d1, 16).to_bytes(4, "little") + int(d2, 16).to_bytes(2, "little")
+            + int(d3, 16).to_bytes(2, "little") + bytes.fromhex(d4 + d5))
+
+
+_OLE_CLSIDS = {
+    _clsid("00020906-0000-0000-C000-000000000046"): "doc",    # Word 8+
+    _clsid("00020900-0000-0000-C000-000000000046"): "doc",    # Word 6/7
+    _clsid("00020820-0000-0000-C000-000000000046"): "xls",    # Excel Book8
+    _clsid("00020810-0000-0000-C000-000000000046"): "xls",    # Excel Book5
+    _clsid("64818D10-4F9B-11CF-86EA-00AA00B929E8"): "ppt",    # PowerPoint 97+
+    _clsid("64818D11-4F9B-11CF-86EA-00AA00B929E8"): "ppt",
+    _clsid("00021A13-0000-0000-C000-000000000046"): "vsd",    # Visio
+    _clsid("00021A20-0000-0000-C000-000000000046"): "vsd",
+    _clsid("0002123D-0000-0000-C000-000000000046"): "pub",    # Publisher
+    _clsid("00020D0B-0000-0000-C000-000000000046"): "msg",    # Outlook message
+    _clsid("000C1084-0000-0000-C000-000000000046"): "msi",    # Windows Installer
+    _clsid("000C1086-0000-0000-C000-000000000046"): "msp",    # installer patch
+    _clsid("000C1082-0000-0000-C000-000000000046"): "mst",    # installer transform
+}
+
 _FREESECT = 0xFFFFFFFF
 
 
@@ -792,12 +880,49 @@ def carve_ole(w: Window) -> Optional[Carve]:
     end = (max_used + 2) * sector                # header occupies "sector -1"
     if end > w.limit:
         return fallback()
+    # The root directory entry names the application outright; stream names are
+    # the fallback for containers that leave the CLSID zeroed.
     ext = "ole"
-    for needle, hint in _OLE_HINTS:
-        if w.find(needle, 0, end) >= 0:
-            ext = hint
-            break
+    dir_sect = _u32le(h, 48)
+    if dir_sect != _FREESECT:
+        root = w.read((dir_sect + 1) * sector, 128)
+        if len(root) == 128:
+            ext = _OLE_CLSIDS.get(bytes(root[80:96]), "ole")
+    if ext == "ole":
+        for needle, hint in _OLE_HINTS:
+            if w.find(needle, 0, end) >= 0:
+                ext = hint
+                break
     return Carve(end, ext, True)
+
+
+# ---------------------------------------------------------------- PST / OST
+
+def carve_pst(w: Window) -> Optional[Carve]:
+    """Outlook personal folders (.pst) and offline stores (.ost).
+
+    The header carries the file size in ROOT.ibFileEof: 8 bytes at 0xB8 for
+    Unicode stores, 4 bytes at 0xA8 for the older ANSI ones (MS-PST 2.2.2.6).
+    A store whose recorded size is not plausible is still carved -- mailboxes
+    are worth recovering truncated -- but capped and flagged unvalidated.
+    """
+    h = w.read(0, 0x100)
+    if len(h) < 0x100 or h[:4] != b"!BDN":
+        return None
+    if _u16le(h, 8) != 0x4D53:                   # wMagicClient "SM"
+        return None
+    ver = _u16le(h, 10)
+    if ver in (14, 15):                          # ANSI store
+        size = _u32le(h, 0xA8)
+        floor = 0x1000
+    elif ver in (23, 36, 37):                    # Unicode store
+        size = _u64le(h, 0xB8)
+        floor = 0x4400
+    else:
+        return None
+    if floor <= size <= w.limit:
+        return Carve(size, "pst", True)
+    return Carve(min(w.limit, 2 * GB), "pst", False)
 
 
 # ---------------------------------------------------------------- Matroska / WebM (EBML)
