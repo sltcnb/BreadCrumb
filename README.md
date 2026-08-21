@@ -206,9 +206,15 @@ you pass the image straight to `bcrumb` with no conversion step:
 
 For EWF the built-in reader is pure Python: it walks the section list, reads
 the chunk table, and handles stored and deflate-compressed chunks, EnCase5/6,
-SMART (`.s01`) and `ewfx` layouts, and multi-segment sets (globbed from the
-first segment). Media size comes from the volume section's sector count, so
-carve offsets match the original disk exactly.
+SMART (`.s01`) and `ewfx` layouts, and multi-segment sets. Media size comes from
+the volume section's sector count, so carve offsets match the original disk
+exactly.
+
+Pass the **first segment only** — `bcrumb RM.E01` — and the rest are found by
+name, through the full libewf sequence (`E01`…`E99`, then `EAA`…`EZZ`, `FAA`…).
+Segments must be siblings with consecutive names. If any are missing, the read
+is refused with a count of what was found rather than silently carving a
+fraction of the evidence.
 
 Install `libewf-python` (`pip install breadcrumb[ewf]`) and libewf is used
 instead wherever it is present — needed for the variants the built-in reader
