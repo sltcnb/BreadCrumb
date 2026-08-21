@@ -68,6 +68,7 @@ SIGNATURES = [
     Signature("bmp", (b"BM",), 0, handlers.carve_bmp, 64 * MB, _pre_bmp),
     Signature("tif", (b"II*\x00", b"MM\x00*"), 0, handlers.carve_tiff, 256 * MB),
     Signature("pdf", (b"%PDF-",), 0, handlers.carve_pdf, 128 * MB),
+    Signature("rtf", (b"{\\rtf",), 0, handlers.carve_rtf, 64 * MB),
     Signature("zip", (b"PK\x03\x04",), 0, handlers.carve_zip, 512 * MB),
     Signature("gz", (b"\x1f\x8b\x08",), 0, handlers.carve_gzip, 256 * MB),
     Signature("7z", (b"7z\xbc\xaf\x27\x1c",), 0, handlers.carve_7z, 4 * GB),
@@ -100,6 +101,7 @@ ALIASES = {
     "jpeg": "jpg", "tiff": "tif", "gzip": "gz", "mov": "mp4", "avi": "riff",
     "wav": "riff", "webp": "riff", "docx": "zip", "xlsx": "zip", "pptx": "zip",
     "doc": "ole", "xls": "ole", "ppt": "ole", "pe": "exe", "dll": "exe",
+    "msg": "ole", "vsd": "ole", "msi": "ole", "pub": "ole",
     "sqlite3": "sqlite", "db": "sqlite",
     "heic": "mp4", "heif": "mp4", "avif": "mp4", "m4a": "mp4", "m4v": "mp4",
     "3gp": "mp4", "webm": "mkv", "matroska": "mkv", "cur": "ico",
@@ -107,17 +109,33 @@ ALIASES = {
 }
 
 
+# Named groups for --types, so a document sweep does not mean listing every
+# container an Office file can arrive in.
+GROUPS = {
+    # Word/Excel/PowerPoint (legacy OLE2 and OOXML), PDF, RTF, OpenDocument.
+    # zip covers docx/xlsx/pptx/odf; ole covers doc/xls/ppt/msg/vsd/msi.
+    "office": ("ole", "zip", "pdf", "rtf"),
+    "docs": ("ole", "zip", "pdf", "rtf"),
+    "images": ("jpg", "png", "gif", "bmp", "tif", "ico", "psd"),
+    "media": ("mp4", "riff", "mp3", "mkv", "ogg", "flac"),
+    "archives": ("zip", "gz", "7z", "rar"),
+}
+
+
 def resolve_types(spec: str):
-    """Parse 'jpg,png,...' into a list of Signatures."""
+    """Parse 'jpg,png,office,...' into a list of Signatures.
+
+    Names may be a type, an alias, or a group from GROUPS.
+    """
     out = []
     for tok in spec.split(","):
         tok = tok.strip().lower()
         if not tok:
             continue
-        name = ALIASES.get(tok, tok)
-        sig = BY_NAME.get(name)
-        if sig is None:
-            raise ValueError(f"unknown type {tok!r} (see --list-types)")
-        if sig not in out:
-            out.append(sig)
+        for name in GROUPS.get(tok, (ALIASES.get(tok, tok),)):
+            sig = BY_NAME.get(name)
+            if sig is None:
+                raise ValueError(f"unknown type {tok!r} (see --list-types)")
+            if sig not in out:
+                out.append(sig)
     return out

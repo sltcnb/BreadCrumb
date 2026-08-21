@@ -40,6 +40,8 @@ CASES = [
     ("gif", "gif", "gif"),
     ("bmp", "bmp", "bmp"),
     ("pdf", "pdf", "pdf"),
+    ("rtf", "rtf", "rtf"),
+    ("ole", "ole", "doc"),
     ("zip", "zip", "zip"),
     ("docx", "zip", "docx"),
     ("gz", "gz", "gz"),
@@ -209,6 +211,51 @@ def test_mp3_absorbs_trailing_id3v1_only_when_it_fits():
     cut = data + b"TAG" + b"\x00" * 60         # truncated: leave it out
     carve = handlers.carve_mp3(window(cut))
     assert carve is not None and carve.size == len(data)
+
+
+# --------------------------------------------------------- Office documents
+
+@pytest.mark.parametrize("stream,ext", [
+    ("WordDocument", "doc"),
+    ("Workbook", "xls"),
+    ("Book", "xls"),                            # Excel 5.0/95
+    ("PowerPoint Document", "ppt"),
+    ("__substg1.0_0037001F", "msg"),            # Outlook message
+    ("VisioDocument", "vsd"),
+    ("SomethingElse", "ole"),                   # unknown: generic container
+])
+def test_ole_extension_comes_from_the_stream_name(stream, ext):
+    """An OLE2 container is only a container; which Office application wrote it
+    is decided by the stream names in its directory. Getting this right is what
+    makes the carve triageable."""
+    data = builders.make_ole(stream)
+    carve = handlers.carve_ole(window(data + junk(2048)))
+    assert carve is not None, f"{stream}: rejected"
+    assert carve.ext == ext
+    assert carve.size == len(data)
+
+
+def test_rtf_survives_escapes_and_binary_blobs():
+    """Naive brace counting breaks on \\{ escapes and on \\binN payloads that
+    contain unbalanced braces; both appear in real documents."""
+    rtf = builders.make_rtf()
+    assert b"\\bin" in rtf and b"}}}" in rtf
+    carve = handlers.carve_rtf(window(rtf + b"TRAILING JUNK" * 8))
+    assert carve is not None and carve.size == len(rtf) and carve.validated
+
+
+def test_rtf_without_a_closing_brace_is_rejected():
+    truncated = builders.make_rtf()[:-1]
+    assert handlers.carve_rtf(window(truncated)) is None
+
+
+def test_office_group_resolves_to_every_document_container():
+    from breadcrumb.signatures import resolve_types
+    names = {s.name for s in resolve_types("office")}
+    assert names == {"ole", "zip", "pdf", "rtf"}
+    # and the per-application aliases still work on their own
+    assert {s.name for s in resolve_types("doc,xls,ppt,docx,xlsx,pptx,pdf")} == \
+        {"ole", "zip", "pdf"}
 
 
 def test_empty_and_tiny_windows():
