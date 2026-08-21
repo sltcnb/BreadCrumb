@@ -200,6 +200,37 @@ def make_ole(stream_name: str = "WordDocument", payload: bytes = b"") -> bytes:
     return bytes(hdr) + bytes(fat) + bytes(directory) + body
 
 
+def make_pst(unicode_store: bool = True, size: int = 0x20000) -> bytes:
+    """Outlook store header (MS-PST 2.2.2.6) padded to its recorded size.
+
+    Only the fields the carver reads are filled in: the magic, the client
+    magic, the version, and ROOT.ibFileEof.
+    """
+    hdr = bytearray(0x4400 if unicode_store else 0x1000)
+    hdr[0:4] = b"!BDN"
+    struct.pack_into("<H", hdr, 0x08, 0x4D53)            # wMagicClient "SM"
+    struct.pack_into("<H", hdr, 0x0A, 23 if unicode_store else 15)
+    struct.pack_into("<H", hdr, 0x0C, 19)                # wVerClient
+    hdr[0x0E] = 1                                        # bPlatformCreate
+    hdr[0x0F] = 1                                        # bPlatformAccess
+    if unicode_store:
+        struct.pack_into("<Q", hdr, 0xB8, size)          # ROOT.ibFileEof
+    else:
+        struct.pack_into("<I", hdr, 0xA8, size)
+    return bytes(hdr).ljust(size, b"\x00")
+
+
+def make_ole_clsid(guid_bytes: bytes, stream_name: str = "Nothing") -> bytes:
+    """An OLE2 container whose root entry carries a CLSID, which is what says
+    for certain which application wrote it."""
+    data = bytearray(make_ole(stream_name))
+    sector = 1 << struct.unpack_from("<H", data, 30)[0]
+    dir_sect = struct.unpack_from("<I", data, 48)[0]
+    root = (dir_sect + 1) * sector
+    data[root + 80:root + 96] = guid_bytes
+    return bytes(data)
+
+
 def make_rtf() -> bytes:
     """RTF with a nested group, an escaped brace, and a \\bin blob whose raw
     bytes include unbalanced braces -- all three trip a naive brace count."""
@@ -302,7 +333,7 @@ def make_psd() -> bytes:
 BUILDERS = {
     "png": make_png, "jpg": make_jpeg, "gif": make_gif, "bmp": make_bmp,
     "pdf": make_pdf, "zip": make_zip, "docx": make_docx_like, "gz": make_gzip,
-    "ole": make_ole, "rtf": make_rtf,
+    "ole": make_ole, "rtf": make_rtf, "pst": make_pst,
     "sqlite": make_sqlite, "mp4": make_mp4, "wav": make_wav, "elf": make_elf,
     "7z": make_7z, "mp3": make_mp3, "macho": make_macho,
     "ico": make_ico, "ogg": make_ogg, "mkv": make_mkv,

@@ -168,7 +168,7 @@ each to its own `part<N>_<fs>/` subdirectory.
 | bmp    | BMP                            | header size field                           |
 | tif    | TIFF                           | IFD + strip/tile extent walk                |
 | pdf    | PDF                            | last `%%EOF` (bounded by next PDF header)   |
-| zip    | ZIP, docx/xlsx/pptx, jar, apk, epub, odf | EOCD record, central-dir cross-check |
+| zip    | ZIP, docx/xlsx/pptx/vsdx, jar, apk, epub, odf | local-header member walk, then central dir + EOCD |
 | gz     | gzip                           | zlib stream decode (multi-member)           |
 | 7z     | 7-Zip                          | next-header offset in signature header      |
 | rar    | RAR4/5                         | none — capped carve, unvalidated            |
@@ -179,7 +179,8 @@ each to its own `part<N>_<fs>/` subdirectory.
 | exe    | PE (exe/dll)                   | section table + Authenticode cert           |
 | elf    | ELF                            | section header table end                    |
 | macho  | Mach-O thin + universal        | load command / fat arch extents             |
-| ole    | OLE2/CFB: doc, xls, ppt, msg, vsd, msi | FAT max-used-sector walk; extension from the stream names |
+| ole    | OLE2/CFB: doc, xls, ppt, msg, vsd, pub, msi | FAT max-used-sector walk; type from the root CLSID, then stream names |
+| pst    | Outlook store (.pst/.ost)      | size from the header's ROOT.ibFileEof        |
 | rtf    | Rich Text Format               | brace depth, honouring escapes and `\binN` blobs |
 | mp4    | MP4/MOV/HEIC/AVIF/3GP/M4A/M4V   | ISO-BMFF box walk + brand-based extension   |
 | mkv    | Matroska / WebM                | EBML element + Segment size                 |

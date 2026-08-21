@@ -84,6 +84,7 @@ SIGNATURES = [
                         b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",
                         b"\xca\xfe\xba\xbe"), 0, handlers.carve_macho, 256 * MB),
     Signature("ole", (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",), 0, handlers.carve_ole, 64 * MB),
+    Signature("pst", (b"!BDN",), 0, handlers.carve_pst, 64 * GB),
     Signature("mkv", (b"\x1a\x45\xdf\xa3",), 0, handlers.carve_mkv, 4 * GB),
     Signature("flac", (b"fLaC",), 0, handlers.carve_flac, 512 * MB),
     Signature("ogg", (b"OggS",), 0, handlers.carve_ogg, 512 * MB),
@@ -101,7 +102,8 @@ ALIASES = {
     "jpeg": "jpg", "tiff": "tif", "gzip": "gz", "mov": "mp4", "avi": "riff",
     "wav": "riff", "webp": "riff", "docx": "zip", "xlsx": "zip", "pptx": "zip",
     "doc": "ole", "xls": "ole", "ppt": "ole", "pe": "exe", "dll": "exe",
-    "msg": "ole", "vsd": "ole", "msi": "ole", "pub": "ole",
+    "msg": "ole", "vsd": "ole", "msi": "ole", "pub": "ole", "msp": "ole",
+    "mst": "ole", "ost": "pst", "vsdx": "zip", "odt": "zip", "ods": "zip",
     "sqlite3": "sqlite", "db": "sqlite",
     "heic": "mp4", "heif": "mp4", "avif": "mp4", "m4a": "mp4", "m4v": "mp4",
     "3gp": "mp4", "webm": "mkv", "matroska": "mkv", "cur": "ico",
@@ -114,8 +116,9 @@ ALIASES = {
 GROUPS = {
     # Word/Excel/PowerPoint (legacy OLE2 and OOXML), PDF, RTF, OpenDocument.
     # zip covers docx/xlsx/pptx/odf; ole covers doc/xls/ppt/msg/vsd/msi.
-    "office": ("ole", "zip", "pdf", "rtf"),
+    "office": ("ole", "zip", "pdf", "rtf", "pst"),
     "docs": ("ole", "zip", "pdf", "rtf"),
+    "mail": ("pst", "ole"),                     # .pst/.ost stores and .msg items
     "images": ("jpg", "png", "gif", "bmp", "tif", "ico", "psd"),
     "media": ("mp4", "riff", "mp3", "mkv", "ogg", "flac"),
     "archives": ("zip", "gz", "7z", "rar"),
