@@ -390,6 +390,7 @@ class EwfReader:
         self.bytes_per_sector = 512
         self.size = 0
         self._sector_counts = ()   # exact media size candidates, see _media_size
+        self._declared_chunks = None   # chunk count the volume section promises
         self._chunks = []          # (segment_idx, file_offset, compressed)
         try:
             self._parse()
@@ -400,6 +401,25 @@ class EwfReader:
             raise
 
     @staticmethod
+    def _segment_names(stem: str, kind: str):
+        """Yield EWF segment paths in libewf's naming order, indefinitely.
+
+        Segments 1-99 are E01..E99; from 100 the two digits become letters and
+        the leading character carries: EAA..EZZ, then FAA..FZZ, and so on to
+        ZZZ. An acquisition of more than 99 segments -- routine for a large
+        disk imaged to removable media -- lands squarely in the letter range.
+        """
+        upper = kind.isupper()
+        letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if upper else "abcdefghijklmnopqrstuvwxyz"
+        for n in range(1, 100):
+            yield f"{stem}.{kind}{n:02d}"
+        start = letters.index(kind.upper() if upper else kind)
+        for first in letters[start:]:
+            for second in letters:
+                for third in letters:
+                    yield f"{stem}.{first}{second}{third}"
+
+    @staticmethod
     def _glob(path):
         # E01, E02, ... or .e01/.ex01 style
         m = re.match(r"(?i)^(.*)\.(e|s|l)(01|x01)$", path)
@@ -407,19 +427,19 @@ class EwfReader:
             if not os.path.exists(path):
                 raise ValueError("EWF segment not found")
             return [path]
-        stem, kind = m.group(1), m.group(2)
+        stem, kind, tail = m.group(1), m.group(2), m.group(3)
+        if tail.lower() == "x01":                # EWF2: Ex01, Ex02, ...
+            segs = []
+            n = 1
+            while os.path.exists(f"{stem}.{kind}x{n:02d}"):
+                segs.append(f"{stem}.{kind}x{n:02d}")
+                n += 1
+            return segs or [path]
         segs = []
-        n = 1
-        while True:
-            cand = f"{stem}.{kind}{n:02d}"
+        for cand in EwfReader._segment_names(stem, kind):
             if not os.path.exists(cand):
-                cand2 = f"{stem}.{kind}x{n:02d}"
-                if os.path.exists(cand2):
-                    cand = cand2
-                else:
-                    break
+                break
             segs.append(cand)
-            n += 1
         return segs or [path]
 
     def _fd(self, idx):
@@ -453,12 +473,24 @@ class EwfReader:
                     self.bytes_per_sector = bps or 512
                     self.chunk_size = spc * self.bytes_per_sector
                     self._sector_counts = (_u64le(vol, 16), _u32le(vol, 16))
+                    if self._declared_chunks is None:
+                        # Segment 1's volume section counts the whole media.
+                        self._declared_chunks = _u32le(vol, 4)
                 elif stype in (b"table",):
                     self._parse_table(fd, sidx, data_off)
                 if next_off == 0 or next_off == offset:
                     break
                 offset = next_off
         if self.chunk_size:
+            # A segment set missing its tail parses fine and simply ends early,
+            # which would silently carve a fraction of the evidence. Refuse.
+            if self._declared_chunks and len(self._chunks) < self._declared_chunks:
+                have, want = len(self._chunks), self._declared_chunks
+                raise ValueError(
+                    f"incomplete EWF set: {len(self.segments)} segment(s) hold "
+                    f"{have} of {want} chunks ({100 * have / want:.1f}% of the "
+                    f"media). Last segment read: {os.path.basename(self.segments[-1])}"
+                    " - the following segments are missing or misnamed.")
             self.size = self._media_size()
 
     def _parse_table(self, fd, sidx, data_off):

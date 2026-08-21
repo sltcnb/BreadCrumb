@@ -272,6 +272,65 @@ def test_ewf_real_multi_segment_roundtrip(tmp_path):
         r.close()
 
 
+def test_segment_names_follow_libewf_naming():
+    """Past segment 99 the digits become letters and the leading character
+    carries: E01..E99, EAA..EZZ, FAA.., through ZZZ. A set that outgrows two
+    digits is routine when imaging a large disk to removable media."""
+    names = EwfReader._segment_names("/ev/RM", "E")
+    got = [next(names).rsplit(".", 1)[1] for _ in range(105)]
+    assert got[:3] == ["E01", "E02", "E03"]
+    assert got[98] == "E99"
+    assert got[99:105] == ["EAA", "EAB", "EAC", "EAD", "EAE", "EAF"]
+    # lowercase sets keep their case
+    lower = EwfReader._segment_names("/ev/rm", "e")
+    assert [next(lower).rsplit(".", 1)[1] for _ in range(100)][-1] == "eaa"
+
+
+@pytest.mark.skipif(not EWFACQUIRE, reason="ewfacquire (libewf) not installed")
+def test_ewf_set_longer_than_99_segments_reads_whole():
+    """The real failure this guards: with 100+ segments the reader used to stop
+    at E99 and report the truncated size as the whole media."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        data = bytearray()
+        while len(data) < 120 << 20:              # ~120 segments at 1 MiB each
+            data += b"\x33" * 4000 + builders.make_png() + builders.make_jpeg()
+        data = bytes(data[:120 << 20])
+        raw = os.path.join(td, "raw.img")
+        with open(raw, "wb") as fh:
+            fh.write(data)
+        first, segs = _acquire(raw, os.path.join(td, "many"),
+                               compression="none", extra=("-S", "1MiB"))
+        assert len(segs) > 99, f"expected a set past E99, got {len(segs)}"
+        assert any(s.endswith("EAA") for s in segs), "expected letter-named segments"
+        r = EwfReader(first)
+        try:
+            assert len(r.segments) == len(segs)
+            assert r.size == len(data)
+            assert r.pread(0, r.size) == data
+        finally:
+            r.close()
+
+
+@pytest.mark.skipif(not EWFACQUIRE, reason="ewfacquire (libewf) not installed")
+def test_incomplete_segment_set_is_refused(tmp_path):
+    """Missing tail segments must be an error, never a short image: carving a
+    fraction of the evidence while reporting success is the worst outcome."""
+    data = bytearray()
+    while len(data) < 4 << 20:                 # 1 MiB is ewfacquire's floor
+        data += b"\x44" * 5000 + builders.make_png()
+    data = bytes(data[:4 << 20])
+    raw = tmp_path / "raw.img"
+    raw.write_bytes(data)
+    first, segs = _acquire(str(raw), str(tmp_path / "part"),
+                           compression="none", extra=("-S", "1MiB"))
+    assert len(segs) >= 3, f"expected a segmented set, got {len(segs)}"
+    for gone in segs[2:]:
+        os.unlink(gone)
+    with pytest.raises(ValueError, match="incomplete EWF set"):
+        EwfReader(first)
+
+
 @pytest.mark.skipif(not (EWFACQUIRE and PYEWF), reason="needs ewfacquire + pyewf")
 def test_ewf_pyewf_and_pure_python_readers_agree(sector_aligned_image, tmp_path):
     """open_source prefers libewf when it is installed, and the two readers
