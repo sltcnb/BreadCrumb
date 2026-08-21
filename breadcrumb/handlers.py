@@ -250,6 +250,56 @@ def carve_pdf(w: Window) -> Optional[Carve]:
     return Carve(end, "pdf", True)
 
 
+# ---------------------------------------------------------------- RTF
+
+def carve_rtf(w: Window) -> Optional[Carve]:
+    """RTF ends where its outermost group closes.
+
+    Brace counting, with two wrinkles that matter on real documents: a
+    backslash escapes the next byte (\\{ is a literal brace), and \\binN
+    introduces N raw bytes that must be skipped whole -- embedded objects
+    routinely contain unbalanced braces.
+    """
+    if w.read(0, 5) != b"{\\rtf":
+        return None
+    pos = 0
+    depth = 0
+    while pos < w.limit:
+        buf = w.read(pos, 1 << 16)
+        if not buf:
+            break
+        i = 0
+        while i < len(buf):
+            c = buf[i]
+            if c == 0x5C:                        # backslash
+                # \binN<space> => skip N bytes of raw data
+                tail = buf[i:i + 24]
+                if tail[1:4] == b"bin" and len(tail) > 4:
+                    j = 4
+                    digits = b""
+                    while j < len(tail) and tail[j:j + 1].isdigit():
+                        digits += tail[j:j + 1]
+                        j += 1
+                    if digits:
+                        skip = int(digits)
+                        if tail[j:j + 1] == b" ":
+                            j += 1
+                        pos += i + j + skip
+                        break                    # re-read from the new position
+                i += 2                           # ordinary escape
+                continue
+            if c == 0x7B:                        # {
+                depth += 1
+            elif c == 0x7D:                      # }
+                depth -= 1
+                if depth == 0:
+                    return Carve(pos + i + 1, "rtf", True)
+            i += 1
+        else:
+            pos += len(buf)
+    return None
+
+
 # ---------------------------------------------------------------- ZIP family
 
 _ZIP_HINTS = [
@@ -664,10 +714,22 @@ def carve_macho(w: Window) -> Optional[Carve]:
 
 # ---------------------------------------------------------------- OLE2 / CFB
 
+def _utf16(name: str) -> bytes:
+    """CFB directory entries store stream names as UTF-16LE."""
+    return name.encode("utf-16-le")
+
+
+# Stream names that identify what an OLE2 container actually holds. Order
+# matters: an .msg carries a Workbook-shaped attachment often enough that the
+# Outlook markers have to be tested first.
 _OLE_HINTS = [
-    ("W\x00o\x00r\x00d\x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t".encode("latin-1"), "doc"),
-    ("W\x00o\x00r\x00k\x00b\x00o\x00o\x00k".encode("latin-1"), "xls"),
-    ("P\x00o\x00w\x00e\x00r\x00P\x00o\x00i\x00n\x00t".encode("latin-1"), "ppt"),
+    (_utf16("__substg1.0_"), "msg"),          # Outlook message
+    (_utf16("__properties_version1.0"), "msg"),
+    (_utf16("VisioDocument"), "vsd"),
+    (_utf16("WordDocument"), "doc"),
+    (_utf16("Workbook"), "xls"),
+    (_utf16("Book"), "xls"),                  # Excel 5.0/95
+    (_utf16("PowerPoint Document"), "ppt"),
 ]
 
 _FREESECT = 0xFFFFFFFF

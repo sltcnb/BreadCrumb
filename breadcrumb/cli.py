@@ -304,6 +304,11 @@ def main(argv=None) -> int:
         for sig in SIGNATURES:
             magics = ", ".join(m.hex() for m in sig.magics)
             print(f"{sig.name:<8} {magics:<40} {sig.max_size >> 20:,} MiB")
+        from .signatures import ALIASES, GROUPS
+        print("\ngroups (usable in -t):")
+        for name, members in GROUPS.items():
+            print(f"  {name:<10} {', '.join(members)}")
+        print("\naliases:", ", ".join(sorted(ALIASES)))
         return 0
 
     if args.from_manifest:                       # no source needed

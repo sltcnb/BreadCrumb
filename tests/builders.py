@@ -143,6 +143,73 @@ def make_mp3() -> bytes:
     return hdr + tag_body + frame * 12
 
 
+def make_ole(stream_name: str = "WordDocument", payload: bytes = b"") -> bytes:
+    """Minimal OLE2/CFB container: header + FAT + directory + one stream.
+
+    Real Office 97-2003 files are exactly this shape, just larger. The stream
+    name is what tells the handler whether it is looking at a .doc, .xls, an
+    Outlook .msg, and so on.
+    """
+    SECTOR = 512
+    FREESECT, ENDOFCHAIN, FATSECT = 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFFFD
+    payload = payload or (b"office payload " * 20)
+
+    hdr = bytearray(SECTOR)
+    hdr[0:8] = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+    struct.pack_into("<HH", hdr, 24, 0x003E, 3)      # minor / major version
+    struct.pack_into("<H", hdr, 28, 0xFFFE)          # little-endian marker
+    struct.pack_into("<H", hdr, 30, 9)               # sector shift: 512 bytes
+    struct.pack_into("<H", hdr, 32, 6)               # mini sector shift
+    struct.pack_into("<I", hdr, 44, 1)               # number of FAT sectors
+    struct.pack_into("<I", hdr, 48, 1)               # first directory sector
+    struct.pack_into("<I", hdr, 56, 4096)            # mini stream cutoff
+    struct.pack_into("<I", hdr, 60, ENDOFCHAIN)      # first mini FAT sector
+    struct.pack_into("<I", hdr, 64, 0)               # mini FAT sector count
+    struct.pack_into("<I", hdr, 68, ENDOFCHAIN)      # first DIFAT sector
+    struct.pack_into("<I", hdr, 72, 0)               # DIFAT sector count
+    for i in range(109):                             # DIFAT: FAT lives at 0
+        struct.pack_into("<I", hdr, 76 + i * 4, 0 if i == 0 else FREESECT)
+
+    data_sectors = max(1, -(-len(payload) // SECTOR))
+    fat = bytearray(b"\xff" * SECTOR)                # all FREESECT
+    struct.pack_into("<I", fat, 0, FATSECT)          # sector 0: the FAT itself
+    struct.pack_into("<I", fat, 4, ENDOFCHAIN)       # sector 1: directory
+    for i in range(data_sectors):                    # sectors 2..: the stream
+        nxt = 3 + i if i + 1 < data_sectors else ENDOFCHAIN
+        struct.pack_into("<I", fat, 8 + i * 4, nxt)
+
+    def dir_entry(name, etype, start, size):
+        e = bytearray(128)
+        nb = name.encode("utf-16-le")[:62]
+        e[0:len(nb)] = nb
+        struct.pack_into("<H", e, 64, len(nb) + 2)   # name length incl. NUL
+        e[66] = etype                                # 5 = root, 2 = stream
+        e[67] = 1                                    # black
+        struct.pack_into("<III", e, 68, FREESECT, FREESECT, FREESECT)
+        struct.pack_into("<I", e, 116, start)
+        struct.pack_into("<Q", e, 120, size)
+        return bytes(e)
+
+    directory = bytearray()
+    directory += dir_entry("Root Entry", 5, ENDOFCHAIN, 0)
+    directory += dir_entry(stream_name, 2, 2, len(payload))
+    directory += b"\x00" * (SECTOR - len(directory) % SECTOR or 0)
+    directory = directory[:SECTOR]
+
+    body = bytes(payload).ljust(data_sectors * SECTOR, b"\x00")
+    return bytes(hdr) + bytes(fat) + bytes(directory) + body
+
+
+def make_rtf() -> bytes:
+    """RTF with a nested group, an escaped brace, and a \\bin blob whose raw
+    bytes include unbalanced braces -- all three trip a naive brace count."""
+    blob = b"}}}{{{"
+    return (b"{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fnil Arial;}}\n"
+            b"\\f0\\fs24 recovered \\{document\\} text\\par\n"
+            b"{\\*\\shppict{\\pict\\pngblip\\bin" + str(len(blob)).encode() + b" " + blob
+            + b"}}\n}")
+
+
 def make_macho() -> bytes:
     """Minimal thin Mach-O 64 LE with one segment + symtab."""
     seg_fileoff, seg_filesize = 0x100, 0x200
@@ -235,6 +302,7 @@ def make_psd() -> bytes:
 BUILDERS = {
     "png": make_png, "jpg": make_jpeg, "gif": make_gif, "bmp": make_bmp,
     "pdf": make_pdf, "zip": make_zip, "docx": make_docx_like, "gz": make_gzip,
+    "ole": make_ole, "rtf": make_rtf,
     "sqlite": make_sqlite, "mp4": make_mp4, "wav": make_wav, "elf": make_elf,
     "7z": make_7z, "mp3": make_mp3, "macho": make_macho,
     "ico": make_ico, "ogg": make_ogg, "mkv": make_mkv,

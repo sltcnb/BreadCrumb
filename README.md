@@ -44,6 +44,10 @@ sudo bcrumb /dev/sdb -o recovered/            # Linux
 bcrumb \\.\PhysicalDrive1 -o recovered\       # Windows (admin shell)
 bcrumb \\.\D: -o recovered\                   # Windows, single volume
 
+# every Office/document container in one sweep (doc/xls/ppt, docx/xlsx/pptx,
+# pdf, rtf, odf) -- see --list-types for the other groups
+bcrumb disk.dd -t office -o out
+
 # only some types
 bcrumb image.dd -t jpg,png,pdf,sqlite -o out/
 
@@ -175,7 +179,8 @@ each to its own `part<N>_<fs>/` subdirectory.
 | exe    | PE (exe/dll)                   | section table + Authenticode cert           |
 | elf    | ELF                            | section header table end                    |
 | macho  | Mach-O thin + universal        | load command / fat arch extents             |
-| ole    | OLE2/CFB (doc, xls, ppt, msi)  | FAT max-used-sector walk                    |
+| ole    | OLE2/CFB: doc, xls, ppt, msg, vsd, msi | FAT max-used-sector walk; extension from the stream names |
+| rtf    | Rich Text Format               | brace depth, honouring escapes and `\binN` blobs |
 | mp4    | MP4/MOV/HEIC/AVIF/3GP/M4A/M4V   | ISO-BMFF box walk + brand-based extension   |
 | mkv    | Matroska / WebM                | EBML element + Segment size                 |
 | ogg    | OGG (Vorbis/Opus/Theora)       | page walk to end-of-stream                  |
