@@ -8,9 +8,11 @@ key-stretch does not take seconds per test.
 
 import os
 
+import struct
+
 import pytest
 
-from breadcrumb import _aes, bitlocker
+from breadcrumb import _aes, bitlocker, images
 from breadcrumb.images import open_source, BitLockerDecryptingReader
 from tests.bitlocker_builder import build_image, SS
 
@@ -22,6 +24,13 @@ RECOVERY = "-".join(f"{v * 11:06d}" for v in (1000, 2000, 3000, 4000,
 @pytest.fixture(autouse=True)
 def _fast_stretch(monkeypatch):
     monkeypatch.setattr(bitlocker, "STRETCH_COUNT", 8)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_credentials(monkeypatch):
+    """The CLI hands credentials to the reader through the environment, so a
+    test that runs main() would otherwise leak its key into the next one."""
+    monkeypatch.delenv("BREADCRUMB_BITLOCKER", raising=False)
 
 
 def _plaintext_volume(n_sectors=8):
@@ -203,3 +212,45 @@ def test_failed_unlock_is_an_error_not_an_empty_result(tmp_path):
     rc = main([str(path), "-o", str(tmp_path / "out2"), "-q",
                "--bitlocker-recovery-key", RECOVERY])
     assert rc == 0
+
+
+@pytest.mark.parametrize("nested", [True, False])
+def test_unlock_handles_both_stretch_key_layouts(tmp_path, nested):
+    """Windows nests the AES-CCM wrapped VMK inside the stretch-key entry.
+    This builder used to emit the two as siblings, so the parser only ever saw
+    the layout it already expected -- and real volumes failed to unlock with a
+    correct recovery key."""
+    vol = bytes(_plaintext_volume(2) + bytes(SS * 8))
+    img = build_image(vol, RECOVERY, method=bitlocker.M_AES_XTS_256,
+                      nest_ccm_in_stretch=nested)
+    path = tmp_path / f"disk_{nested}.dd"
+    path.write_bytes(img)
+    r = images.open_source(str(path))
+    try:
+        vols = images.scan_bitlocker(r, bitlocker.Credentials(recovery=RECOVERY))
+        assert len(vols) == 1, f"nested={nested}: volume did not unlock"
+        assert vols[0].read(0, 8) == vol[:8]
+    finally:
+        r.close()
+
+
+def test_protectors_are_reported_for_key_matching(tmp_path):
+    """The protector identifier is what a recovery-key file calls
+    Identification; reporting it is how an analyst sees that the key in hand
+    belongs to a different volume."""
+    vol = bytes(_plaintext_volume(2) + bytes(SS * 8))
+    path = tmp_path / "disk.dd"
+    path.write_bytes(build_image(vol, RECOVERY))
+    r = images.open_source(str(path))
+    try:
+        boot = r.pread(0, 512)
+        offs = [struct.unpack_from("<Q", boot, 0x160 + i * 8)[0] for i in range(3)]
+        meta = bitlocker.parse_metadata(r.pread(offs[0], 0x10000))
+        prot = bitlocker.protectors(meta)
+        assert len(prot) == 1
+        ident, ptype = prot[0]
+        assert len(ident.split("-")) == 5
+        assert ptype == bitlocker.PROT_RECOVERY
+        assert bitlocker.protector_name(ptype) == "recovery password"
+    finally:
+        r.close()

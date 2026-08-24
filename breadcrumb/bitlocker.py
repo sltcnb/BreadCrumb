@@ -218,27 +218,51 @@ def _key_from_payload(payload: bytes) -> bytes:
 
 # -- VMK / FVEK recovery ---------------------------------------------------
 
+def _vmk_key_material(nested: list) -> tuple:
+    """(stretch salt, every AES-CCM wrapped key) inside one VMK entry.
+
+    Windows nests the encrypted key *inside* the stretch-key entry, whose
+    payload is method(4) || salt(16) || nested entries; other writers put the
+    two side by side. Accept both and let the CCM MAC decide which blob (if
+    any) the derived key opens.
+    """
+    salt = None
+    blobs = []
+    for e in nested:
+        if e.vtype == VT_AES_CCM_KEY:
+            blobs.append(e.data)
+        elif e.vtype == VT_STRETCH_KEY and len(e.data) >= 20:
+            salt = e.data[4:20]
+            for inner in _walk_entries(e.data[20:]):
+                if inner.vtype == VT_AES_CCM_KEY:
+                    blobs.append(inner.data)
+    return salt, blobs
+
+
+def protector_name(protection: int) -> str:
+    return {
+        PROT_CLEAR: "clear key (suspended)", PROT_TPM: "TPM",
+        PROT_STARTUP_KEY: "startup key (.BEK)", PROT_TPM_PIN: "TPM + PIN",
+        PROT_RECOVERY: "recovery password", PROT_PASSWORD: "passphrase",
+    }.get(protection, "unknown")
+
+
 def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
     """Try to turn one VMK metadata entry into the plaintext VMK."""
     data = vmk_entry.data
     protection = struct.unpack_from("<H", data, 0x1A)[0]
     nested = list(_walk_entries(data[0x1C:]))
 
-    def find(vt):
-        return next((e for e in nested if e.vtype == vt), None)
-
     # Clear key (suspended BitLocker): the VMK sits in the open.
     if protection == PROT_CLEAR:
-        k = find(VT_KEY)
+        k = next((e for e in nested if e.vtype == VT_KEY), None)
         if k:
             return _key_from_payload(k.data)
 
-    stretch = find(VT_STRETCH_KEY)
-    ccm = find(VT_AES_CCM_KEY)
+    salt, blobs = _vmk_key_material(nested)
 
-    # Recovery password / passphrase: stretch a salt, AES-CCM-unwrap the VMK.
-    if stretch and ccm:
-        salt = stretch.data[4:20]
+    # Recovery password / passphrase: stretch the salt, AES-CCM-unwrap the VMK.
+    if salt is not None:
         secret = None
         if creds.recovery and (protection == PROT_RECOVERY or protection == 0):
             secret = parse_recovery_password(creds.recovery)
@@ -246,20 +270,22 @@ def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
             secret = creds.password.encode("utf-16-le")
         if secret is not None:
             dk = stretch_key(_password_hash(secret), salt)
-            try:
-                payload = _ccm_blob_decrypt(dk, ccm.data)
-                return _key_from_payload(payload)
-            except ValueError:
-                return None
+            for blob in blobs:
+                try:
+                    return _key_from_payload(_ccm_blob_decrypt(dk, blob))
+                except ValueError:
+                    continue
+            return None
 
     # Startup key (.BEK): the external key AES-CCM-unwraps the VMK directly.
-    if creds.bek and ccm and protection == PROT_STARTUP_KEY:
+    if creds.bek and protection == PROT_STARTUP_KEY:
         ext = _external_key_from_bek(creds.bek)
         if ext is not None:
-            try:
-                return _key_from_payload(_ccm_blob_decrypt(ext, ccm.data))
-            except ValueError:
-                return None
+            for blob in blobs:
+                try:
+                    return _key_from_payload(_ccm_blob_decrypt(ext, blob))
+                except ValueError:
+                    continue
     return None
 
 
@@ -278,6 +304,21 @@ def _external_key_from_bek(bek: bytes) -> bytes | None:
         if e.vtype == VT_KEY:
             return _key_from_payload(e.data)
     return None
+
+
+def protectors(meta: FveMetadata) -> list:
+    """(identifier GUID, protection type) per VMK protector.
+
+    The identifier is what a recovery-key file calls "Identification", so it is
+    how an analyst tells whether the key in hand belongs to this volume at all.
+    """
+    import uuid
+    out = []
+    for e in meta.entries:
+        if e.vtype == VT_VMK and len(e.data) >= 0x1C:
+            out.append((str(uuid.UUID(bytes_le=e.data[:16])),
+                        struct.unpack_from("<H", e.data, 0x1A)[0]))
+    return out
 
 
 def recover_fvek(meta: FveMetadata, creds: Credentials) -> bytes:
@@ -447,6 +488,10 @@ def unlock_volume(reader, base: int, creds: Credentials,
                 continue
     if meta is None:
         raise BitLockerError("FVE boot sector found but no valid metadata block")
+    if log:
+        for ident, prot in protectors(meta):
+            log(f"bitlocker: protector {ident} is a {protector_name(prot)} "
+                f"({prot:#06x})")
     fvek = recover_fvek(meta, creds)
     vol_size = meta.encrypted_volume_size or (reader.size - base)
     vol = BitLockerVolume(reader, base, meta, fvek, sector_size, vol_size)
