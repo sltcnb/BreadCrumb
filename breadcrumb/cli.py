@@ -12,6 +12,7 @@ from collections import Counter
 from . import __version__
 from .carver import Carver, Options, emit, run_parallel
 from .signatures import SIGNATURES, resolve_types
+from .bitlocker import BitLockerError
 
 
 def parse_size(text: str) -> int:
@@ -209,7 +210,7 @@ def run_auto(args) -> int:
 
     try:
         r = open_source(args.source)
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, BitLockerError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     parts = parse(r)
@@ -360,7 +361,7 @@ def _dispatch(args) -> int:
         from .images import open_source
         try:
             r = open_source(args.source)
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError, BitLockerError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
         try:
@@ -456,7 +457,7 @@ def main_carve(args) -> int:
         print(f"error: permission denied opening {args.source!r} "
               "(raw devices usually need sudo)", file=sys.stderr)
         return 1
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, BitLockerError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

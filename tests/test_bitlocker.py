@@ -184,3 +184,22 @@ def test_credentials_env_roundtrip():
         assert got.bek == b"\x01\x02" and got.fvek == b"\xaa\xbb"
     finally:
         os.environ.pop("BREADCRUMB_BITLOCKER", None)
+
+
+def test_failed_unlock_is_an_error_not_an_empty_result(tmp_path):
+    """A credential that opens nothing must fail loudly. Carving ciphertext and
+    reporting "0 files" is indistinguishable from an empty disk, so a mistyped
+    recovery key would look like nothing to recover."""
+    from breadcrumb.cli import main
+    vol = bytes(_plaintext_volume(2) + bytes(SS * 8))
+    img = build_image(vol, RECOVERY, method=bitlocker.M_AES_XTS_256)
+    path = tmp_path / "disk.dd"
+    path.write_bytes(img)
+    wrong = "011011-022011-033011-044011-055011-066011-077011-088011"
+    rc = main([str(path), "-o", str(tmp_path / "out"), "-q",
+               "--bitlocker-recovery-key", wrong])
+    assert rc == 1, "a failed unlock must not exit 0"
+    # ...and the right key still works on the same image
+    rc = main([str(path), "-o", str(tmp_path / "out2"), "-q",
+               "--bitlocker-recovery-key", RECOVERY])
+    assert rc == 0
