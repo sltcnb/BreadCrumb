@@ -140,6 +140,19 @@ def _password_hash(data: bytes) -> bytes:
     return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
+def _password_hashes(data: bytes) -> list:
+    """Candidate initial hashes for the key stretch, in the order to try.
+
+    A passphrase is documented as SHA-256 applied twice over its UTF-16LE form;
+    a recovery password as a single SHA-256 over the 16 bytes the digit groups
+    decode to. Sources disagree over which applies where, and a wrong choice is
+    indistinguishable from a wrong key -- so try both and let the AES-CCM MAC
+    decide. The cost is one extra stretch, only where the first already failed.
+    """
+    single = hashlib.sha256(data).digest()
+    return [hashlib.sha256(single).digest(), single]
+
+
 def stretch_key(password_hash: bytes, salt: bytes) -> bytes:
     """BitLocker key-stretch: STRETCH_COUNT SHA-256 rounds over an 88-byte struct
     (last_hash[32] || initial_hash[32] || salt[16] || count_u64)."""
@@ -269,12 +282,13 @@ def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
         elif creds.password and protection in (PROT_PASSWORD, PROT_TPM_PIN):
             secret = creds.password.encode("utf-16-le")
         if secret is not None:
-            dk = stretch_key(_password_hash(secret), salt)
-            for blob in blobs:
-                try:
-                    return _key_from_payload(_ccm_blob_decrypt(dk, blob))
-                except ValueError:
-                    continue
+            for initial in _password_hashes(secret):
+                dk = stretch_key(initial, salt)
+                for blob in blobs:
+                    try:
+                        return _key_from_payload(_ccm_blob_decrypt(dk, blob))
+                    except ValueError:
+                        continue
             return None
 
     # Startup key (.BEK): the external key AES-CCM-unwraps the VMK directly.
