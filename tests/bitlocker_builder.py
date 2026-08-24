@@ -24,7 +24,14 @@ def _ccm_entry(etype, vtype, key, payload, nonce):
 
 
 def build_image(plaintext_volume: bytes, recovery_password: str,
-                method: int = bitlocker.M_AES_XTS_128) -> bytes:
+                method: int = bitlocker.M_AES_XTS_128,
+                nest_ccm_in_stretch: bool = True) -> bytes:
+    """Build an FVE image.
+
+    nest_ccm_in_stretch puts the AES-CCM wrapped VMK inside the stretch-key
+    entry, which is how Windows writes it; False puts the two side by side, the
+    layout this test builder used to assume. Both must unlock.
+    """
     assert len(plaintext_volume) % SS == 0
     n_sectors = len(plaintext_volume) // SS
 
@@ -65,12 +72,22 @@ def build_image(plaintext_volume: bytes, recovery_password: str,
     nonce_v = b"\x10" * 12
     nonce_f = b"\x20" * 12
 
-    stretch = _entry(0, bitlocker.VT_STRETCH_KEY, b"\x00\x00\x00\x00" + salt)
     vmk_ccm = _ccm_entry(0, bitlocker.VT_AES_CCM_KEY, dk,
                          b"\x01\x00\x00\x00" + vmk, nonce_v)
-    vmk_data = (b"\x00" * 0x18
+    if nest_ccm_in_stretch:
+        stretch = _entry(0, bitlocker.VT_STRETCH_KEY,
+                         b"\x00\x00\x00\x00" + salt + vmk_ccm)
+        protector = stretch
+    else:
+        stretch = _entry(0, bitlocker.VT_STRETCH_KEY, b"\x00\x00\x00\x00" + salt)
+        protector = stretch + vmk_ccm
+    # VMK entry: identifier GUID(16) last_modified(8) unknown(2)
+    # protection_type(2) then the nested protector entries.
+    vmk_data = (bytes(range(16))              # identifier GUID
+                + b"\x00" * 8                 # last modification time
+                + b"\x00\x00"                 # unknown
                 + struct.pack("<H", bitlocker.PROT_RECOVERY)
-                + b"\x00\x00" + stretch + vmk_ccm)
+                + protector)
     vmk_entry = _entry(bitlocker.ET_VMK, bitlocker.VT_VMK, vmk_data)
     fvek_entry = _ccm_entry(bitlocker.ET_FVEK, bitlocker.VT_AES_CCM_KEY, vmk,
                             b"\x01\x00" + struct.pack("<H", method) + fvek, nonce_f)
