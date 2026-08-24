@@ -97,13 +97,22 @@ def scan_bitlocker(reader, creds):
         print(msg, file=sys.stderr)
 
     vols = []
+    failed = []
     for base in sorted(bases):
         try:
             v = bitlocker.unlock_volume(reader, base, creds, log=_log)
             if v:
                 vols.append(v)
         except bitlocker.BitLockerError as e:
+            failed.append((base, str(e)))
             print(f"bitlocker: volume @ {base:#x}: {e}", file=sys.stderr)
+    if failed and not vols:
+        # A credential was supplied and nothing opened. Carrying on would scan
+        # ciphertext and report "0 files", which reads exactly like an empty
+        # disk -- the analyst would have no idea the key was the problem.
+        raise bitlocker.BitLockerError(
+            f"no BitLocker volume could be unlocked ({len(failed)} tried): "
+            + "; ".join(msg for _, msg in failed))
     return vols
 
 
