@@ -404,6 +404,16 @@ def run_ntfs(args) -> int:
     }
     report_path = write_outputs(args, _O, records, vol.volume_size, scan_meta)
 
+    # Deletion times, if asked for: the recycle-bin records and the change
+    # journal are ordinary files, so once they are recovered they can be read.
+    if getattr(args, "deleted_times", None) and not args.dry_run:
+        from . import artifacts
+        events = artifacts.scan_tree_for_artefacts(args.output)
+        n = artifacts.write_events_csv(events, args.deleted_times)
+        if not quiet:
+            print(f"{n} deletion event(s) from $I / $UsnJrnl "
+                  f"-> {args.deleted_times}", file=sys.stderr)
+
     if args.machine:
         emit("summary", recovered=len(records),
              bytes=sum(r.size for r in records), manifest=report_path)
