@@ -101,7 +101,9 @@ def build_image(plaintext_volume: bytes, recovery_password: str,
     block_hdr[0:8] = bitlocker.FVE_SIGNATURE
     struct.pack_into("<Q", block_hdr, 0x10, n_sectors * SS)    # encrypted size
     struct.pack_into("<I", block_hdr, 0x1C, 1)                 # header_sectors
-    struct.pack_into("<Q", block_hdr, 0x20, backup_off)        # volume_header_offset
+    for k in range(3):                                         # metadata offsets
+        struct.pack_into("<Q", block_hdr, 0x20 + k * 8, meta_off)
+    struct.pack_into("<Q", block_hdr, 0x38, backup_off)        # volume_header_offset
 
     block = bytes(block_hdr) + bytes(meta_hdr) + body
     img[meta_off:meta_off + len(block)] = block

@@ -126,9 +126,21 @@ def test_fvek_direct(tmp_path):
         if blk[:8] == bitlocker.FVE_SIGNATURE:
             meta = bitlocker.parse_metadata(blk)
             break
-    fvek = bitlocker.recover_fvek(meta, bitlocker.Credentials(recovery=RECOVERY))
-    vol = bitlocker.unlock_volume(r, 0, bitlocker.Credentials(fvek=fvek))
-    assert vol.read(0, len(pt)) == pt
+    # Recovery yields several readings of the key payload; the real FVEK is the
+    # one that re-unlocks the volume when handed back directly.
+    candidates = bitlocker.recover_fvek_candidates(
+        meta, bitlocker.Credentials(recovery=RECOVERY))
+    assert candidates
+    worked = False
+    for fvek in candidates:
+        try:
+            vol = bitlocker.unlock_volume(r, 0, bitlocker.Credentials(fvek=fvek))
+        except (bitlocker.BitLockerError, ValueError):
+            continue
+        if vol.read(0, len(pt)) == pt:
+            worked = True
+            break
+    assert worked, "no FVEK candidate reproduced the plaintext volume"
     r.close()
 
 
