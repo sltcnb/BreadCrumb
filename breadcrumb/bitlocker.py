@@ -204,9 +204,13 @@ def parse_metadata(block: bytes) -> FveMetadata:
     if block[:8] != FVE_SIGNATURE:
         raise BitLockerError("FVE metadata signature missing")
     # block header (0x40): grab the relocated-volume-header location.
+    # Block header: encrypted_volume_size(8) at 0x10, volume header sector count
+    # at 0x1C, the three metadata offsets at 0x20/0x28/0x30, and the relocated
+    # volume header at 0x38. Reading 0x20 as the volume header offset gets the
+    # block's own address, which decrypts the metadata region as the boot sector.
     encrypted_volume_size = struct.unpack_from("<Q", block, 0x10)[0]
     header_sectors = struct.unpack_from("<I", block, 0x1C)[0]
-    volume_header_offset = struct.unpack_from("<Q", block, 0x20)[0]
+    volume_header_offset = struct.unpack_from("<Q", block, 0x38)[0]
     # FVE metadata header (0x30) follows the block header.
     mh = block[0x40:0x70]
     metadata_size = struct.unpack_from("<I", mh, 0)[0]
@@ -225,8 +229,23 @@ def _ccm_blob_decrypt(key: bytes, blob: bytes) -> bytes:
 
 
 def _key_from_payload(payload: bytes) -> bytes:
-    """A decrypted CCM 'key' payload is a 4-byte header then the raw key bytes."""
+    """First plausible reading, where there is nothing to check the result on."""
     return payload[4:]
+
+
+def _key_candidates(payload: bytes) -> list:
+    """Candidate key bytes in a decrypted CCM payload.
+
+    Windows writes a metadata-entry header and a key-type word before the key --
+    on a real volume the key started 12 bytes in -- while other writers use 4.
+    The CCM MAC covers the ciphertext, not our reading of it, so a wrong guess
+    yields a shifted key that only fails a step later. Offer every reading.
+    """
+    out = []
+    for skip in (12, 8, 4, 0):
+        if len(payload) > skip and payload[skip:] not in out:
+            out.append(payload[skip:])
+    return out
 
 
 # -- VMK / FVEK recovery ---------------------------------------------------
@@ -260,8 +279,8 @@ def protector_name(protection: int) -> str:
     }.get(protection, "unknown")
 
 
-def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
-    """Try to turn one VMK metadata entry into the plaintext VMK."""
+def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> list | None:
+    """Candidate plaintext VMKs from one VMK metadata entry."""
     data = vmk_entry.data
     protection = struct.unpack_from("<H", data, 0x1A)[0]
     nested = list(_walk_entries(data[0x1C:]))
@@ -270,7 +289,7 @@ def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
     if protection == PROT_CLEAR:
         k = next((e for e in nested if e.vtype == VT_KEY), None)
         if k:
-            return _key_from_payload(k.data)
+            return _key_candidates(k.data)
 
     salt, blobs = _vmk_key_material(nested)
 
@@ -286,7 +305,7 @@ def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
                 dk = stretch_key(initial, salt)
                 for blob in blobs:
                     try:
-                        return _key_from_payload(_ccm_blob_decrypt(dk, blob))
+                        return _key_candidates(_ccm_blob_decrypt(dk, blob))
                     except ValueError:
                         continue
             return None
@@ -297,7 +316,7 @@ def _unlock_vmk(vmk_entry: _Entry, creds: Credentials) -> bytes | None:
         if ext is not None:
             for blob in blobs:
                 try:
-                    return _key_from_payload(_ccm_blob_decrypt(ext, blob))
+                    return _key_candidates(_ccm_blob_decrypt(ext, blob))
                 except ValueError:
                     continue
     return None
@@ -335,30 +354,54 @@ def protectors(meta: FveMetadata) -> list:
     return out
 
 
-def recover_fvek(meta: FveMetadata, creds: Credentials) -> bytes:
-    """Recover the FVEK key material from metadata + credentials."""
+def recover_fvek_candidates(meta: FveMetadata, creds: Credentials) -> list:
+    """Candidate FVEKs from metadata + credentials.
+
+    Every VMK reading is tried against every wrapped key entry; the CCM MAC
+    rules out wrong pairings, and each payload that opens contributes its own
+    readings. The caller picks by decrypting a sector and checking the result.
+    """
     if creds.fvek:
-        return creds.fvek
-    vmk = None
+        return [creds.fvek]
+    vmks = []
     for e in meta.entries:
         if e.vtype == VT_VMK:
-            vmk = _unlock_vmk(e, creds)
-            if vmk:
-                break
-    if not vmk:
+            got = _unlock_vmk(e, creds)
+            if got:
+                vmks.extend(got)
+    if not vmks:
         raise BitLockerError(
             "no VMK could be unlocked with the supplied credential "
             "(wrong recovery key / password, or unsupported protector)")
-    # FVEK entry: AES-CCM key wrapped under the VMK.
-    fvek_entry = next((e for e in meta.entries
-                       if e.etype == ET_FVEK and e.vtype == VT_AES_CCM_KEY), None)
-    if fvek_entry is None:
-        fvek_entry = next((e for e in meta.entries
-                           if e.vtype == VT_AES_CCM_KEY), None)
-    if fvek_entry is None:
+    wrapped = [e for e in meta.entries
+               if e.etype == ET_FVEK and e.vtype == VT_AES_CCM_KEY]
+    wrapped += [e for e in meta.entries
+                if e.vtype == VT_AES_CCM_KEY and e.etype != ET_FVEK]
+    if not wrapped:
         raise BitLockerError("no FVEK entry in metadata")
-    payload = _ccm_blob_decrypt(vmk, fvek_entry.data)
-    return _key_from_payload(payload)
+    out = []
+    for entry in wrapped:
+        for vmk in vmks:
+            try:
+                payload = _ccm_blob_decrypt(vmk, entry.data)
+            except ValueError:
+                continue
+            for cand in _key_candidates(payload):
+                if cand not in out:
+                    out.append(cand)
+    if not out:
+        raise BitLockerError("FVEK entry did not decrypt under the recovered VMK")
+    return out
+
+
+def _looks_like_volume_header(sector: bytes) -> bool:
+    """Does this look like the plaintext first sector of a volume?"""
+    if len(sector) < 512:
+        return False
+    if sector[510:512] == b"\x55\xaa":
+        return True
+    return sector[3:11] in (b"NTFS    ", b"EXFAT   ", b"MSDOS5.0",
+                            b"MSWIN4.1", b"FAT32   ")
 
 
 # -- volume cipher ---------------------------------------------------------
@@ -458,10 +501,12 @@ class BitLockerVolume:
         ss = self.sector_size
         sector_no = vpos // ss
         if vpos < self._hdr_bytes and self._hdr_src:
-            # served from the relocated, still-encrypted header backup
-            src = self._hdr_src + vpos
-            ct = self.reader.pread(src, ss)
-            return self.cipher.decrypt_sector(src // ss, ct)
+            # Served from the relocated, still-encrypted header backup. That
+            # offset is volume-relative like every other metadata offset, so the
+            # read needs the volume base while the sector number does not.
+            within = self._hdr_src + vpos
+            ct = self.reader.pread(self.base + within, ss)
+            return self.cipher.decrypt_sector(within // ss, ct)
         ct = self.reader.pread(self.base + vpos, ss)
         if len(ct) < ss:
             ct = ct + b"\x00" * (ss - len(ct))
@@ -471,10 +516,30 @@ class BitLockerVolume:
 # -- detection + unlock ----------------------------------------------------
 
 def _metadata_offsets(boot: bytes) -> list[int]:
-    """Three FVE metadata block offsets stored at 0x160 of the boot sector."""
-    if len(boot) < 0x178:
-        return []
-    return [struct.unpack_from("<Q", boot, 0x160 + i * 8)[0] for i in range(3)]
+    """FVE metadata block offsets from the volume header.
+
+    Windows 7 and later store three of them at 0xB0, right after the BitLocker
+    identifier GUID at 0xA0; Vista used 0x160. Return both sets, dropping zeros,
+    so either layout resolves.
+    """
+    out = []
+    for base in (0xB0, 0x160):
+        if len(boot) < base + 24:
+            continue
+        for i in range(3):
+            off = struct.unpack_from("<Q", boot, base + i * 8)[0]
+            if off and off not in out:
+                out.append(off)
+    return out
+
+
+def volume_identifier(boot: bytes) -> str:
+    """The BitLocker identifier GUID at 0xA0, if the header carries one."""
+    import uuid
+    if len(boot) < 0xB0:
+        return ""
+    ident = str(uuid.UUID(bytes_le=boot[0xA0:0xB0]))
+    return "" if ident.startswith("00000000") else ident
 
 
 def is_bitlocker(reader, base: int) -> bool:
@@ -506,10 +571,32 @@ def unlock_volume(reader, base: int, creds: Credentials,
         for ident, prot in protectors(meta):
             log(f"bitlocker: protector {ident} is a {protector_name(prot)} "
                 f"({prot:#06x})")
-    fvek = recover_fvek(meta, creds)
     vol_size = meta.encrypted_volume_size or (reader.size - base)
-    vol = BitLockerVolume(reader, base, meta, fvek, sector_size, vol_size)
+    vol = None
+    last = None
+    for fvek in recover_fvek_candidates(meta, creds):
+        try:
+            cand = BitLockerVolume(reader, base, meta, fvek, sector_size, vol_size)
+        except (BitLockerError, ValueError) as e:
+            # A candidate of the wrong length is rejected by the cipher itself;
+            # that is a legitimate answer, not a failure to report.
+            last = BitLockerError(str(e))
+            continue
+        # The only test that proves a key: decrypt the first sector and see
+        # whether a filesystem boot sector comes out.
+        if _looks_like_volume_header(cand.read(0, sector_size)):
+            vol = cand
+            break
+        if vol is None:
+            vol = cand
+            vol_unverified = True
+    if vol is None:
+        raise last or BitLockerError("recovered no usable FVEK")
     if log:
+        if locals().get("vol_unverified") and not _looks_like_volume_header(
+                vol.read(0, sector_size)):
+            log("bitlocker: warning: the key recovered does not decrypt the "
+                "volume header into a recognisable boot sector")
         log(f"bitlocker: unlocked volume @ {base:#x} ({vol.method_name}, "
             f"{vol_size / (1 << 30):.1f} GiB)")
     return vol
