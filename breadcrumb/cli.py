@@ -10,7 +10,7 @@ import sys
 from collections import Counter
 
 from . import __version__
-from .carver import Carver, Options, emit, run_parallel
+from .carver import Carver, Options, emit, free_space, run_parallel
 from .signatures import SIGNATURES, resolve_types
 from .bitlocker import BitLockerError
 
@@ -211,6 +211,12 @@ def build_parser() -> argparse.ArgumentParser:
                    default="auto",
                    help="signature matcher backend (auto: Aho-Corasick if "
                         "pyahocorasick is installed and many patterns, else regex)")
+    p.add_argument("--max-output", default="0", metavar="SIZE",
+                   help="stop after writing this much carved data, keeping the "
+                        "manifest (default: no limit)")
+    p.add_argument("--min-free", default="2G", metavar="SIZE",
+                   help="stop when the output volume has less than this free "
+                        "(default 2G; 0 disables the check)")
     p.add_argument("--dry-run", action="store_true",
                    help="report findings without writing carved files")
     p.add_argument("--report", metavar="FILE",
@@ -550,6 +556,8 @@ def main_carve(args) -> int:
         drop_failed=args.drop_failed,
         bifragment=not args.no_bifragment,
         skip_blank=not args.no_skip_blank,
+        max_output=parse_size(args.max_output),
+        min_free=parse_size(args.min_free),
         extra={"matcher": args.matcher},
     )
 
@@ -581,6 +589,23 @@ def main_carve(args) -> int:
         print("warning: --hash-source skipped for devices", file=sys.stderr)
 
     t0 = datetime.datetime.now(datetime.timezone.utc)
+    # A carve can outgrow the volume it is written to, and filling the
+    # filesystem takes the machine with it. Check before writing anything.
+    if not opts.dry_run and opts.min_free:
+        free = free_space(opts.out_dir)
+        if free is not None:
+            if not args.quiet:
+                print(f"output: {free / (1 << 30):,.1f} GiB free on the target "
+                      f"volume, stopping at {opts.min_free / (1 << 30):,.1f} GiB",
+                      file=sys.stderr)
+            if free <= opts.min_free:
+                print(f"error: only {free / (1 << 30):,.1f} GiB free on "
+                      f"{opts.out_dir!r} (below the --min-free floor); write "
+                      "elsewhere, narrow --types, or lower --min-free",
+                      file=sys.stderr)
+                carver.close()
+                return 1
+
     interrupted = False
     try:
         if jobs > 1:

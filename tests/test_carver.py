@@ -198,3 +198,35 @@ def test_cli_end_to_end(image, tmp_path):
     assert len(manifest["files"]) == len(expected)
     shas = {f["sha256"] for f in manifest["files"]}
     assert all(sha in shas for _, _, sha in expected.values())
+
+
+def test_output_budget_stops_the_scan_and_keeps_the_manifest(image, tmp_path):
+    """A carve can outgrow the volume it writes to: on a 238 GB image an
+    unfiltered run reached 51 GB inside the first percent and filled the
+    filesystem, which takes the machine with it."""
+    path, expected = image
+    unlimited = run_carver(path, tmp_path / "all")
+    capped = run_carver(path, tmp_path / "capped", max_output=2048)
+    assert len(capped) < len(unlimited), "the budget stopped nothing"
+    assert capped, "the budget stopped everything"
+    for rec in capped:
+        if rec.path:
+            assert os.path.getsize(rec.path) == rec.size, "truncated carve"
+
+
+def test_min_free_stops_before_filling_the_volume(image, tmp_path):
+    """With a floor above the free space, nothing should be written."""
+    from breadcrumb.carver import free_space
+    path, _ = image
+    free = free_space(str(tmp_path))
+    assert free is not None
+    records = run_carver(path, tmp_path / "out", min_free=free + (1 << 30))
+    assert records == [] or all(not r.path for r in records)
+
+
+def test_free_space_reports_a_plausible_figure(tmp_path):
+    from breadcrumb.carver import free_space
+    free = free_space(str(tmp_path))
+    assert free is not None and free > 0
+    # a path that does not exist yet resolves to its nearest parent
+    assert free_space(str(tmp_path / "nope" / "deeper")) == free

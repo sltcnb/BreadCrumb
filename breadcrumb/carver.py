@@ -54,6 +54,8 @@ class Options:
     drop_failed: bool = False       # discard carves whose deep validation fails
     bifragment: bool = True         # try bifragment recovery on failed decode
     skip_blank: bool = True         # skip all-zero scan chunks
+    max_output: int = 0             # stop after writing this many bytes (0 = no limit)
+    min_free: int = 0               # stop when the output volume has this little free
     extra: dict = field(default_factory=dict)
 
 
@@ -64,6 +66,21 @@ def emit(event: str, **payload):
 
 
 _BIFRAG_EXTS = {"png", "jpg", "jpeg"}     # types bifragment reassembly supports
+
+
+def free_space(path: str) -> int | None:
+    """Bytes free on the filesystem holding path (or its nearest existing parent)."""
+    probe = os.path.abspath(path)
+    while probe and not os.path.exists(probe):
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            return None
+        probe = parent
+    try:
+        st = os.statvfs(probe)
+    except OSError:
+        return None
+    return st.f_bavail * st.f_frsize
 
 
 class Carver:
@@ -86,6 +103,8 @@ class Carver:
         self.matcher = build_matcher(self.by_magic.keys(),
                                      backend=opts.extra.get("matcher", "auto"))
         self._last_progress = 0.0
+        self.written = 0            # carved bytes on disk, for --max-output
+        self.stopped_early = False
 
     # ------------------------------------------------------------------
 
@@ -101,6 +120,8 @@ class Carver:
         t0 = time.monotonic()
 
         while pos < scan_end:
+            if self._budget_spent():
+                break
             want = min(o.chunk_size + overlap, scan_end - pos + overlap)
             buf = self.reader.pread(pos, want)
             if not buf:
@@ -114,6 +135,10 @@ class Carver:
                 pos += limit
                 continue
             for i, magic in self.matcher.finditer(buf):
+                # Per candidate, not per chunk: one 32 MiB chunk can hold
+                # thousands of files, so a chunk-level check overshoots.
+                if self._budget_spent():
+                    break
                 if i >= limit:
                     continue
                 abs_magic = pos + i
@@ -141,6 +166,24 @@ class Carver:
         return self.records
 
     # ------------------------------------------------------------------
+
+    def _budget_spent(self) -> bool:
+        """Has this scan written as much as it is allowed to?
+
+        A carve can outgrow the volume it is written to; filling the filesystem
+        takes the machine with it, so the scan stops itself and leaves a
+        manifest describing what did land.
+        """
+        o = self.opts
+        if self.stopped_early:
+            return True
+        if o.max_output and self.written >= o.max_output:
+            self.stopped_early = True
+        elif o.min_free and not o.dry_run:
+            free = free_space(o.out_dir)
+            if free is not None and free <= o.min_free:
+                self.stopped_early = True
+        return self.stopped_early
 
     def _try_carve(self, sig: Signature, start: int):
         o = self.opts
@@ -213,6 +256,8 @@ class Carver:
                     digest.update(chunk)
                     off += len(chunk)
                     remaining -= len(chunk)
+        if path:
+            self.written += size                 # charged against --max-output
         rec = CarveRecord(sig.name, carve.ext, start, size,
                           digest.hexdigest(), carve.validated, path,
                           verified=verified, fragments=fragments)
@@ -238,6 +283,8 @@ class Carver:
             path = os.path.join(sub, f"f_{start:012x}.{ext}")
             with open(path, "wb") as fh:
                 fh.write(blob)
+        if path:
+            self.written += len(blob)
         rec = CarveRecord(sig.name, ext, start, len(blob), digest.hexdigest(),
                           True, path, verified=True, fragments=fragments)
         if o.machine:

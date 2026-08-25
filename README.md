@@ -305,6 +305,25 @@ Everything past the carve stays here: the filesystem undelete modes, BitLocker,
 the EWF/QCOW2/VMDK readers, `--validate`, `--grep`, and the derived reports. This
 implementation is the reference.
 
+## Not filling the disk
+
+A carve can write more than the target volume holds: on a 238 GB image an
+unfiltered run reached 51 GB inside the first percent. Free space is checked
+before anything is written, and the scan stops itself rather than filling the
+filesystem — a full root filesystem takes the machine with it.
+
+```
+$ bcrumb disk.E01 -t office -o out
+output: 55.0 GiB free on the target volume, stopping at 2.0 GiB
+```
+
+- `--min-free SIZE` — floor on free space, default **2G**. The run refuses to
+  start below it and stops on reaching it. `--min-free 0` disables the check.
+- `--max-output SIZE` — ceiling on carved bytes. The scan stops cleanly and the
+  manifest still describes everything written.
+- `--dry-run` writes nothing and still produces the manifest, which is the cheap
+  way to size a job first.
+
 ## Deletion timestamps
 
 Carving recovers bytes, never metadata — no names, no dates. `--ntfs` recovers
