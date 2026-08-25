@@ -209,6 +209,13 @@ class Carver:
             return None
 
         size = carve.size
+        # A handler must not report more than its window holds: the bytes past
+        # the end are not the file. Checked here as well as in each handler, so
+        # one arithmetic slip in one of 28 parsers cannot write unrelated disk
+        # into evidence.
+        if size > cap:
+            self.rejected += 1
+            return None
         verified = None
         frag_blob = None        # in-memory reassembled bytes (bifragment)
         fragments = None
