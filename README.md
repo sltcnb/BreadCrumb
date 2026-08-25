@@ -305,6 +305,39 @@ Everything past the carve stays here: the filesystem undelete modes, BitLocker,
 the EWF/QCOW2/VMDK readers, `--validate`, `--grep`, and the derived reports. This
 implementation is the reference.
 
+## Deletion timestamps
+
+Carving recovers bytes, never metadata — no names, no dates. `--ntfs` recovers
+names, paths and the MFT timestamps (created, modified, MFT-changed, accessed),
+but NTFS has no "deleted" timestamp: the record's change time is only a proxy.
+
+Two artefacts record deletion directly, and both are parsed:
+
+| Artefact | What it gives |
+| --- | --- |
+| `$Recycle.Bin/$I*` | deletion time, original size, and the full original path, per Explorer-deleted file (v1 Vista–8.1 and v2 Win10+ layouts) |
+| `$Extend/$UsnJrnl:$J` | the change journal: an explicit `file-delete` reason and timestamp per record (USN v2 and v3) |
+
+```sh
+# recover the filesystem and write a deletion timeline in one pass
+bcrumb disk.E01 --ntfs -o out --deleted-times deleted.csv \
+    --bitlocker-recovery-key 650441-...-609257
+
+# or parse artefacts recovered earlier
+bcrumb --parse-usn 'out/ntfs/$Extend/$UsnJrnl-$J' --deleted-times deleted.csv
+bcrumb --parse-recycle 'out/ntfs/$Recycle.Bin'
+```
+
+```
+2026-08-19 16:45:12  $UsnJrnl  contract.docx
+2026-08-19 16:45:12  $I        C:\Users\jl\Desktop\contract.docx
+2026-08-21 08:02:33  $UsnJrnl  notes.txt
+```
+
+The journal is sparse and a carved copy often starts mid-record, so the parser
+steps over zero runs and resynchronises rather than stopping at the first bad
+length. `bcrumb --help` lists a command per scenario.
+
 ## Web UI
 
 An optional Flask front-end lives in [`web/`](web/README.md): drag-and-drop a

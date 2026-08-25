@@ -28,9 +28,98 @@ def parse_size(text: str) -> int:
     return int(float(text) * mult)
 
 
+SCENARIOS = """
+by scenario
+  documents off a disk image
+    bcrumb disk.dd -t office -o out
+  ...that is BitLocker-encrypted (E01 sets: pass the FIRST segment only)
+    bcrumb disk.E01 -t office -o out --bitlocker-recovery-key 650441-...-609257
+  filenames, paths and timestamps as well as content (NTFS)
+    bcrumb disk.dd --ntfs -o out --bodyfile mft.body
+  when files were deleted (recycle bin + change journal)
+    bcrumb disk.dd --ntfs -o out --deleted-times deleted.csv
+  a whole disk with several filesystems, each undeleted in turn
+    bcrumb disk.dd --auto -o out
+  what is on the disk before committing to a scan
+    bcrumb disk.dd --list-partitions
+  inventory without writing any carved data
+    bcrumb disk.dd --dry-run
+  find a keyword, then carve only around it
+    bcrumb disk.dd --grep "secret-project" --max-hits 50
+  only known-good files, discarding anything that fails to decode
+    bcrumb disk.dd -t office --validate --drop-failed -o out
+  a case file: manifest, CSV, timeline and an HTML report
+    bcrumb disk.dd -o out --csv files.csv --timeline timeline.csv --html report.html
+  custody: hash the whole source alongside the carve
+    bcrumb disk.dd -o out --hash-source
+  a big disk, all cores, output on a roomy volume
+    bcrumb disk.dd -j 0 -o /mnt/scratch/out
+  read from a pipe (no seeking; spooled to a temp file)
+    dd if=/dev/sdb | bcrumb - -o out
+  parse artefacts already recovered elsewhere
+    bcrumb --parse-usn '$UsnJrnl-$J' --deleted-times deleted.csv
+    bcrumb --parse-recycle out/ntfs/'$Recycle.Bin'
+"""
+
+
+def _run_artefacts(args) -> int:
+    """--parse-usn / --parse-recycle: read deletion times out of artefacts that
+    have already been recovered."""
+    import os
+
+    from . import artifacts
+
+    events = []
+    if args.parse_usn:
+        try:
+            with open(args.parse_usn, "rb") as fh:
+                data = fh.read()
+        except OSError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        records = list(artifacts.parse_usn_journal(data))
+        events += artifacts.events_from_usn(data)
+        if not args.quiet:
+            print(f"{len(records)} USN record(s), "
+                  f"{sum(1 for r in records if r.deleted)} deletion(s)")
+    if args.parse_recycle:
+        target = args.parse_recycle
+        paths = []
+        if os.path.isdir(target):
+            for dirpath, _d, files in os.walk(target):
+                paths += [os.path.join(dirpath, f) for f in files
+                          if f.lower().startswith("$i")]
+        else:
+            paths = [target]
+        for path in paths:
+            try:
+                with open(path, "rb") as fh:
+                    events += artifacts.events_from_recycle(fh.read(4096),
+                                                            os.path.basename(path))
+            except OSError as e:
+                print(f"warning: {path}: {e}", file=sys.stderr)
+        if not args.quiet:
+            print(f"{len(paths)} recycle-bin record(s) read")
+
+    if args.deleted_times:
+        n = artifacts.write_events_csv(events, args.deleted_times)
+        if not args.quiet:
+            print(f"{n} deletion event(s) -> {args.deleted_times}")
+    elif not args.quiet:
+        for e in sorted(events, key=lambda x: x.when):
+            import datetime
+            iso = (datetime.datetime.fromtimestamp(
+                e.when, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                if e.when else "?")
+            print(f"{iso}  {e.source:<9} {e.name}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="bcrumb",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=SCENARIOS,
         description="Signature-based file carver for disk images and block devices "
                     "(photorec-style). Recovers deleted files by scanning raw bytes; "
                     "no filesystem needed.")
@@ -137,6 +226,16 @@ def build_parser() -> argparse.ArgumentParser:
                         "(.csv or .jsonl) after the scan")
     p.add_argument("--html", metavar="FILE",
                    help="write an HTML report (summary + table + image gallery)")
+    art = p.add_argument_group("deletion timestamps")
+    art.add_argument("--deleted-times", metavar="FILE",
+                     help="write a CSV of deletion events from the recycle bin "
+                          "($I records) and the NTFS change journal "
+                          "($UsnJrnl:$J); use with --ntfs, or with --parse-usn "
+                          "/ --parse-recycle on files recovered already")
+    art.add_argument("--parse-usn", metavar="FILE",
+                     help="parse a $UsnJrnl:$J stream and report its records")
+    art.add_argument("--parse-recycle", metavar="PATH",
+                     help="parse a recycle-bin $I record, or a directory of them")
     p.add_argument("--from-manifest", metavar="FILE",
                    help="skip scanning; build --timeline/--html from an existing "
                         "manifest.json")
@@ -311,6 +410,9 @@ def main(argv=None) -> int:
             print(f"  {name:<10} {', '.join(members)}")
         print("\naliases:", ", ".join(sorted(ALIASES)))
         return 0
+
+    if args.parse_usn or args.parse_recycle:      # no source needed
+        return _run_artefacts(args)
 
     if args.from_manifest:                       # no source needed
         from .report import run_report
