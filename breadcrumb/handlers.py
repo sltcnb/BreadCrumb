@@ -314,6 +314,10 @@ _ZIP_HINTS = [
 ]
 
 
+_ZIP_MEMBER_SANITY = 64 * MB     # largest member size to trust from a local header
+_ZIP_UNRESOLVED_CAP = 16 * MB    # cap when no central directory is ever found
+
+
 def _zip_walk_members(w: Window) -> Tuple[int, bool]:
     """Follow local file headers from the archive start.
 
@@ -336,6 +340,11 @@ def _zip_walk_members(w: Window) -> Tuple[int, bool]:
             return pos, False              # streamed: size is in the descriptor
         if csize == 0xFFFFFFFF:
             return pos, False              # zip64: real size is in the extra field
+        # A member size only means something if the header is really a header.
+        # In carved data a stray PK\x03\x04 declares whatever the next bytes
+        # say, and following that walks unrelated disk by the hundreds of MB.
+        if csize > _ZIP_MEMBER_SANITY:
+            return pos, False
         nxt = pos + 30 + name_len + extra_len + csize
         if nxt <= pos or nxt > w.limit:
             return pos, False              # runs off the end: truncated or fragmented
@@ -391,7 +400,7 @@ def carve_zip(w: Window) -> Optional[Carve]:
 
     # Nothing conclusive: carve only the bytes actually accounted for, flagged
     # unvalidated. The data is at the front; the tail is elsewhere on disk.
-    accounted = min(accounted, w.limit)
+    accounted = min(accounted, w.limit, _ZIP_UNRESOLVED_CAP)
     if accounted <= 0:
         return None
     return Carve(accounted, _zip_ext(w, accounted), False)

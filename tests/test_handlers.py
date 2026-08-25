@@ -166,6 +166,24 @@ def test_zip_carve_stays_inside_the_archive():
     assert later is not None and later.size == len(whole) and later.validated
 
 
+def test_unresolvable_zip_carve_is_bounded():
+    """A stray PK\\x03\\x04 in unrelated data declares whatever the next bytes
+    say. On a real image that walked hundreds of megabytes and produced a
+    400 MB file typed .docx that was not a zip at all."""
+    blob = bytearray(b"PK\x03\x04")
+    blob += bytes([20, 0, 0, 0, 0, 0, 0, 0, 0, 0])         # version..date
+    blob += (0).to_bytes(4, "little")                       # crc
+    blob += (900 << 20).to_bytes(4, "little")               # compressed size: absurd
+    blob += (0).to_bytes(4, "little")
+    blob += (4).to_bytes(2, "little") + (0).to_bytes(2, "little")
+    blob += b"junk"
+    blob += junk(2 << 20)
+    carve = handlers.carve_zip(window(bytes(blob)))
+    if carve is not None:
+        assert carve.size <= 16 * 1024 * 1024, f"carved {carve.size}"
+        assert not carve.validated
+
+
 def test_gzip_multimember():
     data = builders.make_gzip() + builders.make_gzip()
     carve = handlers.carve_gzip(window(data + os.urandom(100)))
