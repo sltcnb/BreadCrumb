@@ -90,6 +90,8 @@ def carve_png(w: Window) -> Optional[Carve]:
         if length > 0x7FFFFFFF or not all(0x41 <= c <= 0x7A and (c <= 0x5A or c >= 0x61) for c in ctype):
             return None
         pos += 12 + length
+        if pos > w.limit:
+            return None                          # chunk length runs off the end
         if ctype == b"IEND":
             return Carve(pos, "png", True)
     return None
