@@ -6,7 +6,7 @@
 [![Dependencies: stdlib only](https://img.shields.io/badge/deps-stdlib%20only-brightgreen)](pyproject.toml)
 
 Signature-based file carver for disk images and block devices, in the spirit of
-PhotoRec / Sleuth Kit. Recovers deleted files by scanning raw bytes — no
+PhotoRec / Sleuth Kit. Recovers deleted files by scanning raw bytes, no
 filesystem metadata needed, so it works on formatted, corrupted, or unknown
 filesystems and on unallocated space.
 
@@ -26,10 +26,10 @@ python3 -m breadcrumb --help
 
 Pure Python 3.10+ / stdlib only. Optional extras improve specific features:
 `Pillow` (full JPEG/PNG decode for `--validate` + JPEG bifragment),
-`libewf-python` (wider EWF/E01 coverage — `pip install breadcrumb[ewf]`;
+`libewf-python` (wider EWF/E01 coverage, `pip install breadcrumb[ewf]`;
 the module it provides is `pyewf`), `pyahocorasick` (faster matching with
 huge signature sets). Disk-image formats (raw, split, EWF/E01, QCOW2, VMDK)
-are auto-detected — see [Image formats](#image-formats).
+are auto-detected, see [Image formats](#image-formats).
 
 ## Usage
 
@@ -38,7 +38,7 @@ are auto-detected — see [Image formats](#image-formats).
 bcrumb image.dd -o recovered/
 
 # carve a whole disk (raw devices need root; on macOS prefer /dev/diskN
-# over /dev/rdiskN — rdisk requires block-aligned reads)
+# over /dev/rdiskN: rdisk requires block-aligned reads)
 sudo bcrumb /dev/disk4 -o recovered/          # macOS
 sudo bcrumb /dev/sdb -o recovered/            # Linux
 bcrumb \\.\PhysicalDrive1 -o recovered\       # Windows (admin shell)
@@ -88,11 +88,11 @@ bcrumb --list-types
 
 ## Modes
 
-**Carving** (default) — scans raw bytes for file signatures. Filesystem-agnostic,
+**Carving** (default): scans raw bytes for file signatures. Filesystem-agnostic,
 recovers from unallocated space, but only contiguous files and no original names.
 `--validate` additionally decodes each carve to confirm integrity and trim tails.
 
-**Filesystem undelete** — parses filesystem metadata for deleted entries,
+**Filesystem undelete**: parses filesystem metadata for deleted entries,
 recovering **original filenames, directory paths, timestamps, and (where the
 metadata survives) fragmented files**:
 
@@ -109,11 +109,11 @@ an explicit `--offset`. Best-effort recoveries (possibly reused clusters,
 fragmented FAT files) are flagged low confidence.
 
 > **Note on HFS+:** a clean unmount journals deleted catalog records away, so
-> deleted *names* often can't be recovered — but the file *data* still is, via
+> deleted *names* often can't be recovered, but the file *data* still is, via
 > carving mode. APFS, being copy-on-write, retains superseded records and
 > recovers deleted files with names + exact content far more reliably.
 
-**Whole disk** — `--list-partitions` prints the MBR/GPT/APM table with the
+**Whole disk**: `--list-partitions` prints the MBR/GPT/APM table with the
 filesystem detected at each partition. `--auto` then runs the matching undelete
 mode on every partition (carving any whose filesystem isn't recognized), writing
 each to its own `part<N>_<fs>/` subdirectory.
@@ -171,7 +171,7 @@ each to its own `part<N>_<fs>/` subdirectory.
 | zip    | ZIP, docx/xlsx/pptx/vsdx, jar, apk, epub, odf | local-header member walk, then central dir + EOCD |
 | gz     | gzip                           | zlib stream decode (multi-member)           |
 | 7z     | 7-Zip                          | next-header offset in signature header      |
-| rar    | RAR4/5                         | none — capped carve, unvalidated            |
+| rar    | RAR4/5                         | none, capped carve, unvalidated            |
 | sqlite | SQLite 3                       | page_size × page_count                      |
 | mp4    | MP4 / MOV                      | top-level box walk                          |
 | riff   | WAV, AVI, WebP                 | RIFF size field                             |
@@ -216,14 +216,14 @@ SMART (`.s01`) and `ewfx` layouts, and multi-segment sets. Media size comes from
 the volume section's sector count, so carve offsets match the original disk
 exactly.
 
-Pass the **first segment only** — `bcrumb RM.E01` — and the rest are found by
+Pass the **first segment only**, `bcrumb RM.E01`, and the rest are found by
 name, through the full libewf sequence (`E01`…`E99`, then `EAA`…`EZZ`, `FAA`…).
 Segments must be siblings with consecutive names. If any are missing, the read
 is refused with a count of what was found rather than silently carving a
 fraction of the evidence.
 
 Install `libewf-python` (`pip install breadcrumb[ewf]`) and libewf is used
-instead wherever it is present — needed for the variants the built-in reader
+instead wherever it is present, needed for the variants the built-in reader
 does not model: **Ex01/EWF2**, bzip2-compressed chunks, and encrypted EWF.
 
 ## Filesystem & OS support
@@ -235,14 +235,14 @@ reads and IOCTL size detection automatically).
 
 Inherent carving limits (same for PhotoRec):
 
-- Only **contiguous** files recover intact — fragmented files yield the first
+- Only **contiguous** files recover intact, fragmented files yield the first
   fragment plus junk.
 - NTFS-compressed or EFS-encrypted files are not in raw format on disk.
 - Full-disk encryption: **BitLocker is unlocked transparently** when you
   supply a credential (see below); LUKS/FileVault still need the unlocked
   device.
-- TRIM'd SSD blocks read back as zeros — unrecoverable by any tool.
-- No filenames/timestamps — that requires filesystem metadata recovery
+- TRIM'd SSD blocks read back as zeros, unrecoverable by any tool.
+- No filenames/timestamps. That requires filesystem metadata recovery
   (Sleuth Kit `fls`/`icat` territory), not carving.
 
 ## BitLocker (Windows FVE)
@@ -276,12 +276,12 @@ breadcrumb[bitlocker]`) swaps in C-backed AES for a large speedup.
 - By default BreadCrumb skips over validated carves (PhotoRec behavior). Use
   `--no-skip` to also find files embedded inside other files.
 - Unvalidated carves (rar, legacy sqlite, gz at window edge) may have junk
-  appended at the tail — the real data is at the front.
+  appended at the tail, the real data is at the front.
 - Throughput is roughly 150–250 MiB/s single-threaded; mostly bounded by
   the regex scan and source read speed. `-j 0` scales it across cores, and the
   [Rust port](#rust-port) carves the same bytes several times faster.
 - Operate on a read-only image (`dd`/`ddrescue` copy) of evidence, never on
-  the original — standard forensic practice.
+  the original, standard forensic practice.
 
 ## Output
 
@@ -296,8 +296,8 @@ optional whole-source hash. CSV and Sleuth Kit bodyfile exports are optional.
 
 [breadcrumb-rs](https://github.com/sltcnb/breadcrumb-rs) ports the **carving
 core** to Rust for throughput: 20 of the 26 signature types, same handlers, same
-output layout. Manifests from the two tools agree byte for byte — matching
-`(offset, size, sha256, ext, validated, duplicate_of)` on every record — and the
+output layout. Manifests from the two tools agree byte for byte, matching
+`(offset, size, sha256, ext, validated, duplicate_of)` on every record, and the
 scan runs about 7x faster, since a native multi-pattern matcher with a SIMD
 prefilter replaces the `re` alternation that dominates the Python profile.
 
@@ -310,23 +310,23 @@ implementation is the reference.
 A carve can write more than the target volume holds: on a 238 GB image an
 unfiltered run reached 51 GB inside the first percent. Free space is checked
 before anything is written, and the scan stops itself rather than filling the
-filesystem — a full root filesystem takes the machine with it.
+filesystem, a full root filesystem takes the machine with it.
 
 ```
 $ bcrumb disk.E01 -t office -o out
 output: 55.0 GiB free on the target volume, stopping at 2.0 GiB
 ```
 
-- `--min-free SIZE` — floor on free space, default **2G**. The run refuses to
+- `--min-free SIZE`: floor on free space, default **2G**. The run refuses to
   start below it and stops on reaching it. `--min-free 0` disables the check.
-- `--max-output SIZE` — ceiling on carved bytes. The scan stops cleanly and the
+- `--max-output SIZE`: ceiling on carved bytes. The scan stops cleanly and the
   manifest still describes everything written.
 - `--dry-run` writes nothing and still produces the manifest, which is the cheap
   way to size a job first.
 
 ## Deletion timestamps
 
-Carving recovers bytes, never metadata — no names, no dates. `--ntfs` recovers
+Carving recovers bytes, never metadata, no names, no dates. `--ntfs` recovers
 names, paths and the MFT timestamps (created, modified, MFT-changed, accessed),
 but NTFS has no "deleted" timestamp: the record's change time is only a proxy.
 
@@ -394,7 +394,7 @@ that need an unavailable tool skip cleanly rather than fail.
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
-development setup and the project's ground rules — most importantly the
+development setup and the project's ground rules, most importantly the
 **stdlib-only** runtime constraint. Security issues should be reported
 privately per [SECURITY.md](SECURITY.md).
 
